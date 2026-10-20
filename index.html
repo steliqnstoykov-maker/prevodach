@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Преводач">
+<link rel="manifest" href="manifest.json">
+<title>Преводач</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#f1f5f9;display:flex;flex-direction:column;height:100vh;height:100dvh;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom)}
+.row{display:flex;gap:8px;align-items:center;padding:6px 0;flex-wrap:wrap}
+select{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:12px;border:0;background:#1e293b;color:#f1f5f9}
+button{font-size:16px;border:0;border-radius:12px;padding:10px 12px;background:#334155;color:#fff}
+#swap{font-size:20px}
+.cal{flex:1}
+#log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 0}
+.msg{background:#1e293b;border-radius:14px;padding:12px;border-left:6px solid #3b82f6}
+.msg.B{border-left-color:#22c55e}
+.msg .o{opacity:.7;font-size:15px}
+.msg .t{font-size:22px;margin-top:6px;font-weight:600}
+.msg .re{margin-top:6px;padding:4px 10px;font-size:14px}
+textarea{flex:1;font-size:18px;padding:10px;border-radius:12px;border:0;background:#1e293b;color:#f1f5f9;resize:none;font-family:inherit}
+.msg .re{margin-right:6px}
+#live{min-height:28px;opacity:.85;padding:6px 2px;font-style:italic}
+#go{flex:1;font-size:22px;padding:16px;background:#16a34a}
+#go.on{background:#dc2626}
+label{display:flex;gap:6px;align-items:center;font-size:14px}
+input[type=range]{width:90px}
+</style>
+</head>
+<body>
+<div class="row">
+  <select id="A"></select>
+  <button id="swap" title="Размени">⇄</button>
+  <select id="B"></select>
+</div>
+<div class="row">
+  <button class="cal" id="cA">🎙 Глас A</button>
+  <button class="cal" id="cB">🎙 Глас B</button>
+</div>
+<div class="row">
+  <label><input type="checkbox" id="auto"> 🧠 Разпознаване по глас</label>
+  <label><input type="checkbox" id="alt" checked> Редуване</label>
+  <label>Скорост <input type="range" id="rate" min="0.7" max="1.3" step="0.1" value="1"></label>
+  <button id="clr">🗑</button>
+</div>
+<div id="log"></div>
+<div id="live"></div>
+<div class="row"><textarea id="txt" rows="2" placeholder="✍️ Напиши текст за превод..."></textarea></div>
+<div class="row">
+  <button class="cal" id="sA">A ➜ B</button>
+  <button class="cal" id="sB">B ➜ A</button>
+  <label><input type="checkbox" id="tts" checked> 🔊 Чети</label>
+</div>
+<div class="row"><button id="go">🎤 Старт разговор</button></div>
+<script>
+// [речев код, име, знаме] - първите пет са по избран ред
+const LANGS=[
+["en-US","English","🇬🇧"],["bg-BG","Български","🇧🇬"],["ru-RU","Русский","🇷🇺"],["uk-UA","Українська","🇺🇦"],["tr-TR","Türkçe","🇹🇷"],
+["af-ZA","Afrikaans","🇿🇦"],["sq-AL","Shqip","🇦🇱"],["ar-SA","العربية","🇸🇦"],["hy-AM","Հայերեն","🇦🇲"],["az-AZ","Azərbaycan","🇦🇿"],
+["be-BY","Беларуская","🇧🇾"],["bn-BD","বাংলা","🇧🇩"],["bs-BA","Bosanski","🇧🇦"],["ca-ES","Català","🇪🇸"],["zh-CN","中文","🇨🇳"],
+["hr-HR","Hrvatski","🇭🇷"],["cs-CZ","Čeština","🇨🇿"],["da-DK","Dansk","🇩🇰"],["nl-NL","Nederlands","🇳🇱"],["et-EE","Eesti","🇪🇪"],
+["tl-PH","Filipino","🇵🇭"],["fi-FI","Suomi","🇫🇮"],["fr-FR","Français","🇫🇷"],["ka-GE","ქართული","🇬🇪"],["de-DE","Deutsch","🇩🇪"],
+["el-GR","Ελληνικά","🇬🇷"],["he-IL","עברית","🇮🇱"],["hi-IN","हिन्दी","🇮🇳"],["hu-HU","Magyar","🇭🇺"],["is-IS","Íslenska","🇮🇸"],
+["id-ID","Indonesia","🇮🇩"],["ga-IE","Gaeilge","🇮🇪"],["it-IT","Italiano","🇮🇹"],["ja-JP","日本語","🇯🇵"],["kk-KZ","Қазақша","🇰🇿"],
+["ko-KR","한국어","🇰🇷"],["lv-LV","Latviešu","🇱🇻"],["lt-LT","Lietuvių","🇱🇹"],["mk-MK","Македонски","🇲🇰"],["ms-MY","Melayu","🇲🇾"],
+["mt-MT","Malti","🇲🇹"],["mn-MN","Монгол","🇲🇳"],["no-NO","Norsk","🇳🇴"],["fa-IR","فارسی","🇮🇷"],["pl-PL","Polski","🇵🇱"],
+["pt-PT","Português","🇵🇹"],["ro-RO","Română","🇷🇴"],["sr-RS","Српски","🇷🇸"],["sk-SK","Slovenčina","🇸🇰"],["sl-SI","Slovenščina","🇸🇮"],
+["es-ES","Español","🇪🇸"],["sw-KE","Kiswahili","🇰🇪"],["sv-SE","Svenska","🇸🇪"],["th-TH","ไทย","🇹🇭"],["ur-PK","اردو","🇵🇰"],
+["uz-UZ","Oʻzbek","🇺🇿"],["vi-VN","Tiếng Việt","🇻🇳"]
+];
+const $=id=>document.getElementById(id);
+const SEL={A:$("A"),B:$("B")};
+LANGS.forEach((l,i)=>{for(const w of ["A","B"]){const o=document.createElement("option");o.value=i;o.textContent=l[2]+"  "+l[1];SEL[w].appendChild(o)}});
+SEL.A.value=localStorage.getItem("A")||1; SEL.B.value=localStorage.getItem("B")||0;
+const other=w=>w==="A"?"B":"A";
+const api=c=>c.startsWith("zh")?c:c.split("-")[0];
+const live=t=>$("live").textContent=t;
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec,running=false,busy=false,cur="A",tok=0,frames=[],checked=false,calibrating=false;
+let prof=JSON.parse(localStorage.getItem("prof")||"{}");
+let stream,ctx,an,td,fd;
+
+function refreshCal(){
+  for(const w of ["A","B"])$("c"+w).textContent=(prof[w]?"✅":"🎙")+" Глас "+w+" "+LANGS[SEL[w].value][2];
+  $("sA").textContent=LANGS[SEL.A.value][2]+" ➜ "+LANGS[SEL.B.value][2];
+  $("sB").textContent=LANGS[SEL.B.value][2]+" ➜ "+LANGS[SEL.A.value][2];
+  $("auto").disabled=!(prof.A&&prof.B);
+  if($("auto").disabled)$("auto").checked=false;
+}
+function langChanged(){localStorage.setItem("A",SEL.A.value);localStorage.setItem("B",SEL.B.value);refreshCal()}
+SEL.A.onchange=SEL.B.onchange=langChanged;
+$("swap").onclick=()=>{[SEL.A.value,SEL.B.value]=[SEL.B.value,SEL.A.value];
+  const p=prof.A;prof.A=prof.B;prof.B=p;localStorage.setItem("prof",JSON.stringify(prof));langChanged()};
+$("clr").onclick=()=>{$("log").innerHTML=""};
+
+// ---------- Микрофон и отпечатък на гласа ----------
+async function initMic(){
+  if(stream){ctx.resume();return true}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false}});
+    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=ctx.createMediaStreamSource(stream);
+    an=ctx.createAnalyser();an.fftSize=2048;src.connect(an);
+    td=new Float32Array(an.fftSize);fd=new Float32Array(an.frequencyBinCount);
+    setInterval(sample,50);
+    return true;
+  }catch(e){alert("Няма достъп до микрофона. Разреши го от иконата до адреса.");return false}
+}
+function pitch(buf,sr){
+  const n=buf.length,minLag=Math.floor(sr/400),maxLag=Math.floor(sr/70);
+  let e0=0;for(let i=0;i<n;i++)e0+=buf[i]*buf[i];
+  if(e0<1e-6)return 0;
+  let best=0,bl=0;
+  for(let lag=minLag;lag<=maxLag;lag++){
+    let s=0;for(let i=0;i<n-lag;i++)s+=buf[i]*buf[i+lag];
+    if(s>best){best=s;bl=lag}
+  }
+  return(bl&&best/e0>0.3)?sr/bl:0;
+}
+const NB=24;
+function bands(fd,sr){
+  const hz=sr/an.fftSize,out=[];
+  for(let i=0;i<NB;i++){
+    const lo=Math.max(1,Math.floor(100*Math.pow(40,i/NB)/hz));
+    const hi=Math.max(lo+1,Math.floor(100*Math.pow(40,(i+1)/NB)/hz));
+    let s=0,c=0;
+    for(let k=lo;k<hi&&k<fd.length;k++){s+=isFinite(fd[k])?fd[k]:-140;c++}
+    out.push(c?s/c:-140);
+  }
+  const m=out.reduce((a,b)=>a+b,0)/NB;
+  return out.map(x=>x-m);
+}
+function sample(){
+  if(!an||busy)return;
+  an.getFloatTimeDomainData(td);
+  let e=0;for(let i=0;i<td.length;i++)e+=td[i]*td[i];
+  if(Math.sqrt(e/td.length)<0.012)return;
+  an.getFloatFrequencyData(fd);
+  frames.push({p:pitch(td,ctx.sampleRate),b:bands(fd,ctx.sampleRate)});
+  if(frames.length>400)frames.shift();
+}
+function summarize(fr){
+  if(fr.length<10)return null;
+  const ps=fr.map(f=>f.p).filter(p=>p>0).sort((a,b)=>a-b);
+  const p=ps.length>=5?ps[Math.floor(ps.length/2)]:0;
+  const b=new Array(NB).fill(0);
+  fr.forEach(f=>f.b.forEach((v,i)=>b[i]+=v/fr.length));
+  return{p,b};
+}
+function dist(s,r){
+  let d=0;for(let i=0;i<NB;i++)d+=(s.b[i]-r.b[i])**2;
+  d=Math.sqrt(d/NB);
+  const pd=(s.p&&r.p)?Math.abs(12*Math.log2(s.p/r.p)):4;
+  return d/3+pd/4;
+}
+function classify(fr){
+  const s=summarize(fr);
+  if(!s||!prof.A||!prof.B)return null;
+  const a=dist(s,prof.A),b=dist(s,prof.B);
+  return{who:a<b?"A":"B",margin:Math.abs(a-b)/(a+b+1e-6)};
+}
+async function calibrate(w){
+  if(running){alert("Първо спри разговора.");return}
+  if(calibrating||!(await initMic()))return;
+  calibrating=true;frames=[];let t=6;
+  const btn=$("c"+w);btn.textContent="🎙 Говори... "+t+"с";
+  const timer=setInterval(()=>{
+    btn.textContent="🎙 Говори... "+(--t)+"с";
+    if(t<=0){
+      clearInterval(timer);calibrating=false;
+      const s=summarize(frames);
+      if(!s||frames.length<30)alert("Не чух достатъчно глас. Опитай пак по-близо до микрофона.");
+      else{prof[w]=s;localStorage.setItem("prof",JSON.stringify(prof))}
+      frames=[];refreshCal();
+    }
+  },1000);
+}
+$("cA").onclick=()=>calibrate("A");
+$("cB").onclick=()=>calibrate("B");
+
+// ---------- Превод ----------
+async function gt(text,f,t){
+  const u="https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl="+api(f)+"&tl="+api(t)+"&q="+encodeURIComponent(text);
+  const r=await fetch(u);if(!r.ok)throw new Error("gt");
+  const j=await r.json();return j[0].map(x=>x[0]).join("");
+}
+async function mm(text,f,t){
+  const u="https://api.mymemory.translated.net/get?q="+encodeURIComponent(text)+"&langpair="+api(f)+"|"+api(t);
+  const j=await(await fetch(u)).json();
+  const s=j.responseData.translatedText;
+  if(/MYMEMORY WARNING/i.test(s))throw new Error("mm");
+  return s;
+}
+async function translate(text,f,t){
+  try{return await gt(text,f,t)}catch(_){return await mm(text,f,t)}
+}
+function speak(text,lang){
+  return new Promise(res=>{
+    const u=new SpeechSynthesisUtterance(text);u.lang=lang;u.rate=parseFloat($("rate").value);
+    const v=speechSynthesis.getVoices().find(v=>v.lang.replace("_","-").toLowerCase().startsWith(lang.split("-")[0].toLowerCase()));
+    if(v)u.voice=v;
+    u.onend=u.onerror=()=>res();
+    speechSynthesis.cancel();speechSynthesis.speak(u);
+    setTimeout(res,25000);
+  });
+}
+function addMsg(w,orig,tr,f,t){
+  const d=document.createElement("div");d.className="msg "+w;
+  d.innerHTML='<div class="o"></div><div class="t"></div><button class="re">🔊 Повтори</button><button class="re cp">📋 Копирай</button>';
+  d.children[0].textContent="Говорител "+w+" · "+f[2]+" "+orig;
+  d.children[1].textContent=t[2]+" "+tr;
+  d.children[2].onclick=()=>speak(tr,t[0]);
+  d.children[3].onclick=()=>{try{navigator.clipboard.writeText(tr)}catch(_){}};
+  $("log").appendChild(d);$("log").scrollTop=1e9;
+}
+
+// ---------- Слушане ----------
+function startRec(w){
+  if(!running)return;
+  cur=w;frames=[];checked=false;
+  const lang=LANGS[SEL[w].value];
+  const my=++tok;
+  rec=new SR();rec.lang=lang[0];rec.continuous=true;rec.interimResults=true;
+  rec.onresult=e=>{
+    if(my!==tok||busy)return;
+    let interim="",fin="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal)fin+=r[0].transcript;else interim+=r[0].transcript;
+    }
+    const heard=(fin||interim).trim();
+    if(heard)live(lang[2]+" "+heard);
+    // Проверка кой говори (само веднъж на изказване)
+    if(!checked&&$("auto").checked&&heard&&frames.length>=12){
+      checked=true;
+      const c=classify(frames);
+      if(c&&c.who!==cur&&c.margin>=0.08){
+        live("🧠 Говори другият човек, сменям езика...");
+        tok++;try{rec.abort()}catch(_){}
+        setTimeout(()=>startRec(c.who),150);
+        return;
+      }
+    }
+    if(fin.trim())handle(fin.trim(),cur);
+  };
+  rec.onend=()=>{if(my===tok&&running&&!busy)setTimeout(()=>startRec(cur),200)};
+  rec.onerror=e=>{
+    if(e.error==="not-allowed"||e.error==="service-not-allowed"){stop();alert("Разреши микрофона.")}
+  };
+  try{rec.start()}catch(_){}
+}
+async function handle(text,spk){
+  busy=true;tok++;try{rec.abort()}catch(_){}
+  const f=LANGS[SEL[spk].value],t=LANGS[SEL[other(spk)].value];
+  live("⏳ Превеждам...");
+  try{
+    const tr=await translate(text,f[0],t[0]);
+    addMsg(spk,text,tr,f,t);
+    live("🔊");
+    await speak(tr,t[0]);
+  }catch(e){live("Грешка при превода (проверете интернет).")}
+  busy=false;live("");
+  const nxt=($("auto").checked||$("alt").checked)?other(spk):spk;
+  if(running)startRec(nxt);
+}
+function stop(){
+  running=false;tok++;try{rec.abort()}catch(_){}
+  speechSynthesis.cancel();busy=false;
+  $("go").textContent="🎤 Старт разговор";$("go").classList.remove("on");live("");
+}
+$("go").onclick=async()=>{
+  if(!SR){alert("Този браузър не поддържа разпознаване на реч. Ползвай Chrome.");return}
+  if(running){stop();return}
+  if(!(await initMic()))return;
+  running=true;busy=false;
+  $("go").textContent="⏹ Стоп";$("go").classList.add("on");
+  speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  startRec("A");
+};
+// ---------- Писане на текст ----------
+async function sendText(from){
+  const text=$("txt").value.trim();
+  if(!text)return;
+  const f=LANGS[SEL[from].value],t=LANGS[SEL[other(from)].value];
+  live("⏳ Превеждам...");
+  try{
+    const tr=await translate(text,f[0],t[0]);
+    addMsg(from,text,tr,f,t);
+    $("txt").value="";
+    live("");
+    if($("tts").checked&&!running)await speak(tr,t[0]);
+  }catch(e){live("Грешка при превода (проверете интернет).")}
+}
+$("sA").onclick=()=>sendText("A");
+$("sB").onclick=()=>sendText("B");
+$("txt").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText("A")}});
+refreshCal();
+</script>
+</body>
+</html>
