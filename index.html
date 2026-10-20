@@ -23,6 +23,8 @@ button{font-size:16px;border:0;border-radius:12px;padding:10px 12px;background:#
 .msg .re{margin-top:6px;padding:4px 10px;font-size:14px}
 textarea{flex:1;font-size:18px;padding:10px;border-radius:12px;border:0;background:#1e293b;color:#f1f5f9;resize:none;font-family:inherit}
 .msg .re{margin-right:6px}
+.who button{flex:1;font-size:18px;padding:14px 8px}
+.who button.act{background:#2563eb;outline:2px solid #93c5fd}
 #live{min-height:28px;opacity:.85;padding:6px 2px;font-style:italic}
 #go{flex:1;font-size:22px;padding:16px;background:#16a34a}
 #go.on{background:#dc2626}
@@ -46,6 +48,7 @@ input[type=range]{width:90px}
   <label>Скорост <input type="range" id="rate" min="0.7" max="1.3" step="0.1" value="1"></label>
   <button id="clr">🗑</button>
 </div>
+<div class="row who"><button id="wA">A</button><button id="wB">B</button></div>
 <div id="log"></div>
 <div id="live"></div>
 <div class="row"><textarea id="txt" rows="2" placeholder="✍️ Напиши текст за превод..."></textarea></div>
@@ -86,6 +89,8 @@ let stream,ctx,an,td,fd;
 
 function refreshCal(){
   for(const w of ["A","B"])$("c"+w).textContent=(prof[w]?"✅":"🎙")+" Глас "+w+" "+LANGS[SEL[w].value][2];
+  $("wA").textContent=LANGS[SEL.A.value][2]+" "+LANGS[SEL.A.value][1];
+  $("wB").textContent=LANGS[SEL.B.value][2]+" "+LANGS[SEL.B.value][1];
   $("sA").textContent=LANGS[SEL.A.value][2]+" ➜ "+LANGS[SEL.B.value][2];
   $("sB").textContent=LANGS[SEL.B.value][2]+" ➜ "+LANGS[SEL.A.value][2];
   $("auto").disabled=!(prof.A&&prof.B);
@@ -224,7 +229,9 @@ function startRec(w){
   cur=w;frames=[];checked=false;
   const lang=LANGS[SEL[w].value];
   const my=++tok;
-  rec=new SR();rec.lang=lang[0];rec.continuous=true;rec.interimResults=true;
+  $("wA").classList.toggle("act",w==="A");$("wB").classList.toggle("act",w==="B");
+  live("🎤 Слушам "+lang[2]+" "+lang[1]+"...");
+  rec=new SR();rec.lang=lang[0];rec.continuous=false;rec.interimResults=true;
   rec.onresult=e=>{
     if(my!==tok||busy)return;
     let interim="",fin="";
@@ -249,11 +256,26 @@ function startRec(w){
   };
   rec.onend=()=>{if(my===tok&&running&&!busy)setTimeout(()=>startRec(cur),200)};
   rec.onerror=e=>{
-    if(e.error==="not-allowed"||e.error==="service-not-allowed"){stop();alert("Разреши микрофона.")}
+    if(my!==tok)return;
+    if(e.error==="not-allowed"||e.error==="service-not-allowed"){
+      stop();
+      live("⛔ Няма достъп до гласово разпознаване. На iPhone: отвори сайта в Safari (не от иконата на началния екран) и включи Настройки › Общи › Клавиатура › Диктовка. После разреши микрофона.");
+    }else if(e.error==="audio-capture"){stop();live("⛔ Не намирам микрофон.")}
+    else if(e.error==="language-not-supported"){stop();live("⛔ Този език не се поддържа за говор на това устройство.")}
+    else if(e.error==="network"){live("⚠️ Няма връзка за разпознаване на реч.")}
   };
   try{rec.start()}catch(_){}
 }
+function dedupe(t){
+  const w=t.trim().split(/\s+/);
+  if(w.length>=2&&w.length%2===0&&w.length<=12){
+    const h=w.length/2;
+    if(w.slice(0,h).join(" ").toLowerCase()===w.slice(h).join(" ").toLowerCase())return w.slice(0,h).join(" ");
+  }
+  return t.trim();
+}
 async function handle(text,spk){
+  text=dedupe(text);
   busy=true;tok++;try{rec.abort()}catch(_){}
   const f=LANGS[SEL[spk].value],t=LANGS[SEL[other(spk)].value];
   live("⏳ Превеждам...");
@@ -271,16 +293,25 @@ function stop(){
   running=false;tok++;try{rec.abort()}catch(_){}
   speechSynthesis.cancel();busy=false;
   $("go").textContent="🎤 Старт разговор";$("go").classList.remove("on");live("");
+  $("wA").classList.remove("act");$("wB").classList.remove("act");
 }
-$("go").onclick=async()=>{
-  if(!SR){alert("Този браузър не поддържа разпознаване на реч. Ползвай Chrome.");return}
-  if(running){stop();return}
-  if(!(await initMic()))return;
+async function begin(w){
+  if(!SR){alert("Този браузър не поддържа разпознаване на реч. Ползвай Chrome или Safari.");return}
+  if($("auto").checked&&!(await initMic()))return;
   running=true;busy=false;
   $("go").textContent="⏹ Стоп";$("go").classList.add("on");
   speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-  startRec("A");
-};
+  startRec(w);
+}
+function pick(w){
+  if(!running){begin(w);return}
+  if(busy)return;
+  tok++;try{rec.abort()}catch(_){}
+  setTimeout(()=>startRec(w),150);
+}
+$("go").onclick=()=>{if(running)stop();else begin("A")};
+$("wA").onclick=()=>pick("A");
+$("wB").onclick=()=>pick("B");
 // ---------- Писане на текст ----------
 async function sendText(from){
   const text=$("txt").value.trim();
@@ -298,6 +329,8 @@ async function sendText(from){
 $("sA").onclick=()=>sendText("A");
 $("sB").onclick=()=>sendText("B");
 $("txt").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText("A")}});
+$("auto").onchange=async()=>{if($("auto").checked&&!(await initMic()))$("auto").checked=false};
+if(navigator.standalone)live("ℹ️ От иконата на iPhone гласът не работи. За глас отвори сайта в Safari.");
 refreshCal();
 </script>
 </body>
