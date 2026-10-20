@@ -45,7 +45,10 @@ input[type=range]{width:90px}
 <div class="row">
   <label><input type="checkbox" id="auto"> 🧠 Разпознаване по глас</label>
   <label><input type="checkbox" id="alt" checked> Редуване</label>
+  <label><input type="checkbox" id="smart"> 🤖 Умен режим (авто език)</label>
+  <button id="key">🔑</button>
   <label>Скорост <input type="range" id="rate" min="0.7" max="1.3" step="0.1" value="1"></label>
+  <label>Пауза <input type="range" id="pause" min="0.8" max="3.5" step="0.1" value="1.6"></label>
   <button id="clr">🗑</button>
 </div>
 <div class="row who"><button id="wA">A</button><button id="wB">B</button></div>
@@ -85,7 +88,8 @@ const live=t=>$("live").textContent=t;
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let rec,running=false,busy=false,cur="A",tok=0,frames=[],checked=false,calibrating=false;
 let prof=JSON.parse(localStorage.getItem("prof")||"{}");
-let stream,ctx,an,td,fd;
+let stream,ctx,an,td,fd,msrc,commitTimer,pending="",lastAct=0;
+let proc=null,smartRun=false,sbusy=false,speaking=false,ring=[],chunks=[],lastVoice=0,startT=0,voicedMs=0,nf=0.005;
 
 function refreshCal(){
   for(const w of ["A","B"])$("c"+w).textContent=(prof[w]?"✅":"🎙")+" Глас "+w+" "+LANGS[SEL[w].value][2];
@@ -108,8 +112,9 @@ async function initMic(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false}});
     ctx=new (window.AudioContext||window.webkitAudioContext)();
-    const src=ctx.createMediaStreamSource(stream);
-    an=ctx.createAnalyser();an.fftSize=2048;src.connect(an);
+    if(ctx.resume)ctx.resume();
+    msrc=ctx.createMediaStreamSource(stream);
+    an=ctx.createAnalyser();an.fftSize=2048;msrc.connect(an);
     td=new Float32Array(an.fftSize);fd=new Float32Array(an.frequencyBinCount);
     setInterval(sample,50);
     return true;
@@ -223,48 +228,18 @@ function addMsg(w,orig,tr,f,t){
   $("log").appendChild(d);$("log").scrollTop=1e9;
 }
 
-// ---------- Слушане ----------
-function startRec(w){
-  if(!running)return;
-  cur=w;frames=[];checked=false;
-  const lang=LANGS[SEL[w].value];
-  const my=++tok;
-  $("wA").classList.toggle("act",w==="A");$("wB").classList.toggle("act",w==="B");
-  live("🎤 Слушам "+lang[2]+" "+lang[1]+"...");
-  rec=new SR();rec.lang=lang[0];rec.continuous=false;rec.interimResults=true;
-  rec.onresult=e=>{
-    if(my!==tok||busy)return;
-    let interim="",fin="";
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      const r=e.results[i];
-      if(r.isFinal)fin+=r[0].transcript;else interim+=r[0].transcript;
-    }
-    const heard=(fin||interim).trim();
-    if(heard)live(lang[2]+" "+heard);
-    // Проверка кой говори (само веднъж на изказване)
-    if(!checked&&$("auto").checked&&heard&&frames.length>=12){
-      checked=true;
-      const c=classify(frames);
-      if(c&&c.who!==cur&&c.margin>=0.08){
-        live("🧠 Говори другият човек, сменям езика...");
-        tok++;try{rec.abort()}catch(_){}
-        setTimeout(()=>startRec(c.who),150);
-        return;
-      }
-    }
-    if(fin.trim())handle(fin.trim(),cur);
-  };
-  rec.onend=()=>{if(my===tok&&running&&!busy)setTimeout(()=>startRec(cur),200)};
-  rec.onerror=e=>{
-    if(my!==tok)return;
-    if(e.error==="not-allowed"||e.error==="service-not-allowed"){
-      stop();
-      live("⛔ Няма достъп до гласово разпознаване. На iPhone: отвори сайта в Safari (не от иконата на началния екран) и включи Настройки › Общи › Клавиатура › Диктовка. После разреши микрофона.");
-    }else if(e.error==="audio-capture"){stop();live("⛔ Не намирам микрофон.")}
-    else if(e.error==="language-not-supported"){stop();live("⛔ Този език не се поддържа за говор на това устройство.")}
-    else if(e.error==="network"){live("⚠️ Няма връзка за разпознаване на реч.")}
-  };
-  try{rec.start()}catch(_){}
+// ---------- Слушане (безплатен режим) ----------
+const pauseMs=()=>parseFloat($("pause").value)*1000;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function collect(rs){
+  const out=[];
+  for(let i=0;i<rs.length;i++){
+    const t=rs[i][0].transcript.trim();
+    if(!t)continue;
+    if(out.length&&t.toLowerCase().startsWith(out[out.length-1].toLowerCase()))out[out.length-1]=t;
+    else out.push(t);
+  }
+  return out.join(" ");
 }
 function dedupe(t){
   const w=t.trim().split(/\s+/);
@@ -274,9 +249,57 @@ function dedupe(t){
   }
   return t.trim();
 }
+function startRec(w){
+  if(!running)return;
+  clearInterval(commitTimer);
+  cur=w;frames=[];checked=false;pending="";lastAct=0;
+  const lang=LANGS[SEL[w].value];
+  const my=++tok;
+  $("wA").classList.toggle("act",w==="A");$("wB").classList.toggle("act",w==="B");
+  live("🎤 Слушам "+lang[2]+" "+lang[1]+"...");
+  rec=new SR();rec.lang=lang[0];rec.continuous=true;rec.interimResults=true;
+  rec.onresult=e=>{
+    if(my!==tok||busy)return;
+    const t=collect(e.results);
+    if(!t)return;
+    if(t!==pending){pending=t;lastAct=Date.now()}
+    live(lang[2]+" "+t);
+    // Проверка кой говори (само веднъж на изказване)
+    if(!checked&&$("auto").checked&&frames.length>=12){
+      checked=true;
+      const c=classify(frames);
+      if(c&&c.who!==cur&&c.margin>=0.08){
+        live("🧠 Говори другият човек, сменям езика...");
+        clearInterval(commitTimer);tok++;try{rec.abort()}catch(_){}
+        setTimeout(()=>startRec(c.who),150);
+        return;
+      }
+    }
+  };
+  rec.onend=()=>{
+    if(my!==tok)return;
+    if(pending&&!busy){const t=pending;pending="";clearInterval(commitTimer);handle(t,cur);return}
+    if(running&&!busy)setTimeout(()=>startRec(cur),200);
+  };
+  rec.onerror=e=>{
+    if(my!==tok)return;
+    if(e.error==="not-allowed"||e.error==="service-not-allowed"){
+      stop();
+      live("⛔ Няма достъп до гласово разпознаване. На iPhone: отвори сайта в Safari (не от иконата) и включи Настройки › Общи › Клавиатура › Диктовка. Или ползвай 🤖 Умен режим.");
+    }else if(e.error==="audio-capture"){stop();live("⛔ Не намирам микрофон.")}
+    else if(e.error==="language-not-supported"){stop();live("⛔ Този език не се поддържа за говор на това устройство.")}
+    else if(e.error==="network"){live("⚠️ Няма връзка за разпознаване на реч.")}
+  };
+  // превежда чак когато човекът е млъкнал за зададената пауза
+  commitTimer=setInterval(()=>{
+    if(my!==tok||busy||!pending)return;
+    if(Date.now()-lastAct>pauseMs()){const t=pending;pending="";clearInterval(commitTimer);handle(t,cur)}
+  },200);
+  try{rec.start()}catch(_){}
+}
 async function handle(text,spk){
   text=dedupe(text);
-  busy=true;tok++;try{rec.abort()}catch(_){}
+  busy=true;tok++;clearInterval(commitTimer);try{rec.abort()}catch(_){}
   const f=LANGS[SEL[spk].value],t=LANGS[SEL[other(spk)].value];
   live("⏳ Превеждам...");
   try{
@@ -289,13 +312,113 @@ async function handle(text,spk){
   const nxt=($("auto").checked||$("alt").checked)?other(spk):spk;
   if(running)startRec(nxt);
 }
+
 function stop(){
-  running=false;tok++;try{rec.abort()}catch(_){}
-  speechSynthesis.cancel();busy=false;
+  running=false;smartRun=false;tok++;clearInterval(commitTimer);
+  try{rec.abort()}catch(_){}
+  if(proc){try{msrc.disconnect(proc);proc.disconnect()}catch(_){}proc=null}
+  speechSynthesis.cancel();busy=false;sbusy=false;speaking=false;ring=[];chunks=[];
   $("go").textContent="🎤 Старт разговор";$("go").classList.remove("on");live("");
   $("wA").classList.remove("act");$("wB").classList.remove("act");
 }
+
+// ---------- Умен режим: автоматичен език чрез OpenAI Whisper ----------
+function askKey(){
+  const k=prompt("Постави своя OpenAI ключ (започва с sk-). Той остава само в този браузър.");
+  if(k&&k.trim().startsWith("sk-")){localStorage.setItem("oaikey",k.trim());return true}
+  return false;
+}
+$("key").onclick=askKey;
+$("smart").onchange=()=>{if($("smart").checked&&!localStorage.getItem("oaikey")&&!askKey())$("smart").checked=false};
+
+function toWav(chs,sr){
+  let n=0;chs.forEach(c=>n+=c.length);
+  const all=new Float32Array(n);let o=0;chs.forEach(c=>{all.set(c,o);o+=c.length});
+  let pk=0;for(let i=0;i<n;i++){const a=Math.abs(all[i]);if(a>pk)pk=a}
+  const g=pk>0?Math.min(8,0.9/pk):1;
+  const r=sr/16000,m=Math.floor(n/r),buf=new ArrayBuffer(44+m*2),v=new DataView(buf);
+  const w=(p,t)=>{for(let i=0;i<t.length;i++)v.setUint8(p+i,t.charCodeAt(i))};
+  w(0,"RIFF");v.setUint32(4,36+m*2,true);w(8,"WAVE");w(12,"fmt ");v.setUint32(16,16,true);
+  v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,16000,true);v.setUint32(28,32000,true);
+  v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,"data");v.setUint32(40,m*2,true);
+  for(let i=0;i<m;i++){
+    const a=Math.floor(i*r),b=Math.max(a+1,Math.min(n,Math.floor((i+1)*r)));
+    let t=0;for(let k=a;k<b;k++)t+=all[k];
+    t=Math.max(-1,Math.min(1,(t/(b-a))*g));
+    v.setInt16(44+i*2,t*32767,true);
+  }
+  return new Blob([buf],{type:"audio/wav"});
+}
+async function whisper(blob){
+  const fd=new FormData();
+  fd.append("file",blob,"a.wav");fd.append("model","whisper-1");fd.append("response_format","verbose_json");
+  const r=await fetch("https://api.openai.com/v1/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+localStorage.getItem("oaikey")},body:fd});
+  if(!r.ok)throw new Error(String(r.status));
+  return r.json();
+}
+function langOf(name){
+  name=(name||"").toLowerCase();if(!name)return null;
+  let dn;try{dn=new Intl.DisplayNames(["en"],{type:"language"})}catch(_){return null}
+  for(const w of ["A","B"]){
+    try{let n=dn.of(api(LANGS[SEL[w].value][0])).toLowerCase();if(n==="filipino")n="tagalog";if(n.startsWith(name))return w}catch(_){}
+  }
+  return null;
+}
+function onAudio(e){
+  if(!smartRun||sbusy)return;
+  const c=new Float32Array(e.inputBuffer.getChannelData(0));
+  let q=0;for(let i=0;i<c.length;i++)q+=c[i]*c[i];
+  const rms=Math.sqrt(q/c.length),now=Date.now();
+  const thr=Math.max(0.010,nf*2.5),voiced=rms>thr;
+  if(!speaking){
+    if(!voiced)nf=Math.min(0.05,nf*0.97+rms*0.03);
+    ring.push(c);if(ring.length>5)ring.shift();
+    if(voiced){speaking=true;chunks=ring.slice();ring=[];lastVoice=now;startT=now;voicedMs=0;live("🗣 Чувам те...")}
+    return;
+  }
+  chunks.push(c);
+  if(voiced){lastVoice=now;voicedMs+=c.length/ctx.sampleRate*1000}
+  const dur=now-startT,need=pauseMs()+(dur<1500?300:0);
+  if(now-lastVoice>need||dur>30000)finishUtter();
+}
+async function finishUtter(){
+  speaking=false;const ch=chunks;chunks=[];
+  if(voicedMs<350){live("🎤 Слушам автоматично...");return}
+  sbusy=true;live("⏳ Разпознавам...");
+  try{
+    const j=await whisper(toWav(ch,ctx.sampleRate));
+    const text=(j.text||"").trim();
+    if(text.length>1){
+      const who=langOf(j.language);
+      const f=who?LANGS[SEL[who].value]:["auto","","🌐"];
+      const t=who?LANGS[SEL[other(who)].value]:LANGS[SEL.A.value];
+      live("⏳ Превеждам...");
+      const tr=await translate(text,f[0],t[0]);
+      addMsg(who||"B",text,tr,f,t);
+      live("🔊");
+      await speak(tr,t[0]);
+    }
+  }catch(e){
+    live(e.message==="401"?"⛔ Грешен OpenAI ключ - натисни 🔑.":e.message==="429"?"⛔ Няма кредит или лимитът е изчерпан в OpenAI.":"⚠️ Грешка: "+e.message);
+    await sleep(2500);
+  }
+  await sleep(400);
+  if(smartRun){ring=[];speaking=false;sbusy=false;live("🎤 Слушам автоматично...")}
+}
+async function smartBegin(){
+  if(!localStorage.getItem("oaikey")&&!askKey()){$("smart").checked=false;return}
+  if(!(await initMic()))return;
+  smartRun=true;running=true;sbusy=false;speaking=false;ring=[];chunks=[];
+  proc=ctx.createScriptProcessor(4096,1,1);
+  proc.onaudioprocess=onAudio;
+  msrc.connect(proc);proc.connect(ctx.destination);
+  $("go").textContent="⏹ Стоп";$("go").classList.add("on");
+  speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  live("🎤 Слушам автоматично...");
+}
+
 async function begin(w){
+  if($("smart").checked){await smartBegin();return}
   if(!SR){alert("Този браузър не поддържа разпознаване на реч. Ползвай Chrome или Safari.");return}
   if($("auto").checked&&!(await initMic()))return;
   running=true;busy=false;
@@ -304,6 +427,7 @@ async function begin(w){
   startRec(w);
 }
 function pick(w){
+  if($("smart").checked)return;
   if(!running){begin(w);return}
   if(busy)return;
   tok++;try{rec.abort()}catch(_){}
@@ -312,6 +436,7 @@ function pick(w){
 $("go").onclick=()=>{if(running)stop();else begin("A")};
 $("wA").onclick=()=>pick("A");
 $("wB").onclick=()=>pick("B");
+
 // ---------- Писане на текст ----------
 async function sendText(from){
   const text=$("txt").value.trim();
