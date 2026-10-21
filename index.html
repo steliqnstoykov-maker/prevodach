@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Преводач">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#0f172a">
+<script src="firebase-config.js"></script>
 <title>Преводач</title>
 <style>
 *{box-sizing:border-box}
@@ -25,6 +28,17 @@ textarea{flex:1;font-size:18px;padding:10px;border-radius:12px;border:0;backgrou
 .msg .re{margin-right:6px}
 .who button{flex:1;font-size:18px;padding:14px 8px}
 .who button.act{background:#2563eb;outline:2px solid #93c5fd}
+#ov{display:none;position:fixed;inset:0;background:#0f172a;z-index:50;flex-direction:column;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom)}
+#ov.on{display:flex}
+.ovh{display:flex;gap:8px;align-items:center;padding:10px 0}
+.ovh b{font-size:20px}
+.ovh input{flex:1;min-width:0;font-size:16px;padding:10px;border-radius:12px;border:0;background:#1e293b;color:#f1f5f9}
+#hl{flex:1;overflow-y:auto}
+.hd{opacity:.6;font-size:13px;margin:14px 2px 6px}
+.hi{background:#1e293b;border-radius:12px;padding:10px;margin-bottom:8px}
+.hi .o{opacity:.7;font-size:14px}
+.hi .t{font-size:18px;font-weight:600;margin-top:4px}
+.hi button{padding:4px 10px;font-size:13px;margin:6px 6px 0 0}
 #live{min-height:28px;opacity:.85;padding:6px 2px;font-style:italic}
 #go{flex:1;font-size:22px;padding:16px;background:#16a34a}
 #go.on{background:#dc2626}
@@ -33,6 +47,7 @@ input[type=range]{width:90px}
 </style>
 </head>
 <body>
+<div class="row"><button class="cal" id="hist">📜 История</button><button class="cal" id="login">👤 Вход с Google</button></div>
 <div class="row">
   <select id="A"></select>
   <button id="swap" title="Размени">⇄</button>
@@ -61,6 +76,11 @@ input[type=range]{width:90px}
   <label><input type="checkbox" id="tts" checked> 🔊 Чети</label>
 </div>
 <div class="row"><button id="go">🎤 Старт разговор</button></div>
+<div id="ov">
+  <div class="ovh"><b>📜 История</b><input id="hq" placeholder="🔍 Търси..."><button id="hx">✖</button></div>
+  <div id="hl"></div>
+  <div class="row"><button id="hclr">🗑 Изчисти историята</button><span id="hst"></span></div>
+</div>
 <script>
 // [речев код, име, знаме] - първите пет са по избран ред
 const LANGS=[
@@ -219,6 +239,7 @@ function speak(text,lang){
   });
 }
 function addMsg(w,orig,tr,f,t){
+  saveHist(w,orig,tr,f,t);
   const d=document.createElement("div");d.className="msg "+w;
   d.innerHTML='<div class="o"></div><div class="t"></div><button class="re">🔊 Повтори</button><button class="re cp">📋 Копирай</button>';
   d.children[0].textContent="Говорител "+w+" · "+f[2]+" "+orig;
@@ -456,7 +477,120 @@ $("sB").onclick=()=>sendText("B");
 $("txt").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText("A")}});
 $("auto").onchange=async()=>{if($("auto").checked&&!(await initMic()))$("auto").checked=false};
 if(navigator.standalone)live("ℹ️ От иконата на iPhone гласът не работи. За глас отвори сайта в Safari.");
+// ---------- История и профил ----------
+const hkey=()=>"hist:"+((window.cloud&&window.cloud.user)?window.cloud.user.uid:"guest");
+function getH(k){try{return JSON.parse(localStorage.getItem(k||hkey())||"[]")}catch(_){return[]}}
+function setH(a,k){try{localStorage.setItem(k||hkey(),JSON.stringify(a.slice(0,500)))}catch(_){}}
+function saveHist(w,o,r,f,t){
+  const it={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),t:Date.now(),w:w,
+    fc:f[0],ff:f[2],fn:f[1]||"",tc:t[0],tf:t[2],tn:t[1]||"",o:o,r:r};
+  const a=getH();a.unshift(it);setH(a);
+  if(window.cloud&&window.cloud.user)window.cloud.save(it).catch(()=>{});
+}
+function renderH(){
+  const q=($("hq").value||"").toLowerCase();
+  const a=getH().filter(x=>!q||(x.o+" "+x.r).toLowerCase().includes(q));
+  const box=$("hl");box.innerHTML="";
+  if(!a.length){box.innerHTML='<div class="hd">Още няма записи.</div>';return}
+  let day="";
+  a.forEach(x=>{
+    const d=new Date(x.t);
+    const ds=d.toLocaleDateString("bg-BG",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+    if(ds!==day){day=ds;const h=document.createElement("div");h.className="hd";h.textContent=ds;box.appendChild(h)}
+    const e=document.createElement("div");e.className="hi";
+    e.innerHTML='<div class="o"></div><div class="t"></div><button>🔊</button><button>📋</button><button>🗑</button>';
+    e.children[0].textContent=d.toLocaleTimeString("bg-BG",{hour:"2-digit",minute:"2-digit"})+" · "+x.ff+" "+x.o;
+    e.children[1].textContent=x.tf+" "+x.r;
+    e.children[2].onclick=()=>speak(x.r,x.tc);
+    e.children[3].onclick=()=>{try{navigator.clipboard.writeText(x.r)}catch(_){}};
+    e.children[4].onclick=()=>{
+      setH(getH().filter(y=>y.id!==x.id));
+      if(window.cloud&&window.cloud.user)window.cloud.del(x.id).catch(()=>{});
+      renderH();
+    };
+    box.appendChild(e);
+  });
+}
+$("hist").onclick=()=>{$("ov").classList.add("on");renderH()};
+$("hx").onclick=()=>$("ov").classList.remove("on");
+$("hq").oninput=renderH;
+$("hclr").onclick=async()=>{
+  const c=window.cloud,inCloud=c&&c.user;
+  if(!confirm("Да изчистя цялата история"+(inCloud?" (и от профила)":"")+"?"))return;
+  setH([]);
+  if(inCloud){try{await c.clear()}catch(_){}}
+  renderH();
+};
+function authUI(){
+  const u=window.cloud&&window.cloud.user;
+  $("login").textContent=u?("👤 "+((u.displayName||u.email||"Профил").split(" ")[0])):"👤 Вход с Google";
+}
+async function syncCloud(){
+  const c=window.cloud;
+  if(!(c&&c.user))return;
+  $("hst").textContent="☁️ Синхронизирам...";
+  try{
+    const g=getH("hist:guest"),remote=await c.all();
+    for(const it of g)await c.save(it);
+    setH([],"hist:guest");
+    const m=new Map();
+    [...remote,...g,...getH()].forEach(x=>m.set(x.id,x));
+    setH([...m.values()].sort((a,b)=>b.t-a.t));
+    $("hst").textContent="☁️ Синхронизирано";
+  }catch(e){$("hst").textContent="⚠️ Облакът не отговаря"}
+  renderH();
+}
+window.addEventListener("cloudauth",()=>{authUI();syncCloud()});
+$("login").onclick=async()=>{
+  const c=window.cloud;
+  if(!(c&&c.ok)){alert("Профилите още не са настроени в приложението.");return}
+  if(c.user){if(confirm("Изход от "+(c.user.email||"профила")+"?"))await c.signOut();return}
+  try{await c.signIn()}
+  catch(e){alert("Не успях да вляза: "+(e.code||e.message)+"\nНа iPhone опитай от Safari (не от иконата на началния екран).")}
+};
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+authUI();
 refreshCal();
+</script>
+<script type="module">
+const cfg=window.FIREBASE_CONFIG;
+if(cfg&&cfg.apiKey){
+  try{
+    const V="https://www.gstatic.com/firebasejs/10.12.2/";
+    const {initializeApp}=await import(V+"firebase-app.js");
+    const A=await import(V+"firebase-auth.js");
+    const F=await import(V+"firebase-firestore.js");
+    const app=initializeApp(cfg),auth=A.getAuth(app),db=F.getFirestore(app);
+    let user=null;
+    const col=()=>F.collection(db,"users",user.uid,"history");
+    window.cloud={
+      ok:true,
+      get user(){return user},
+      signIn:()=>A.signInWithPopup(auth,new A.GoogleAuthProvider()),
+      signOut:()=>A.signOut(auth),
+      save:async it=>{if(user)await F.setDoc(F.doc(db,"users",user.uid,"history",it.id),it)},
+      del:async id=>{if(user)await F.deleteDoc(F.doc(db,"users",user.uid,"history",id))},
+      all:async()=>{
+        if(!user)return[];
+        const s=await F.getDocs(F.query(col(),F.orderBy("t","desc"),F.limit(1000)));
+        return s.docs.map(d=>d.data());
+      },
+      clear:async()=>{
+        if(!user)return;
+        for(;;){
+          const s=await F.getDocs(F.query(col(),F.limit(400)));
+          if(s.empty)break;
+          const b=F.writeBatch(db);s.docs.forEach(d=>b.delete(d.ref));await b.commit();
+        }
+      }
+    };
+    A.onAuthStateChanged(auth,u=>{user=u;window.dispatchEvent(new Event("cloudauth"))});
+  }catch(e){
+    console.error(e);
+    window.cloud={ok:false};
+    window.dispatchEvent(new Event("cloudauth"));
+  }
+}
 </script>
 </body>
 </html>
