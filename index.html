@@ -28,6 +28,13 @@ textarea{flex:1;font-size:18px;padding:10px;border-radius:12px;border:0;backgrou
 .msg .re{margin-right:6px}
 .who button{flex:1;font-size:18px;padding:14px 8px}
 .who button.act{background:#2563eb;outline:2px solid #93c5fd}
+#lg{display:none;position:fixed;inset:0;background:#0f172a;z-index:60;flex-direction:column;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);overflow-y:auto}
+#lg.on{display:flex}
+.lgb{display:flex;flex-direction:column;gap:10px;max-width:420px;width:100%;margin:16px auto}
+.lgb input{font-size:17px;padding:14px;border-radius:12px;border:0;background:#1e293b;color:#f1f5f9}
+.lgb button{padding:14px;font-size:17px}
+#lgoogle{background:#2563eb}
+#lmsg{min-height:44px;opacity:.95}
 #ov{display:none;position:fixed;inset:0;background:#0f172a;z-index:50;flex-direction:column;padding:env(safe-area-inset-top) 12px env(safe-area-inset-bottom)}
 #ov.on{display:flex}
 .ovh{display:flex;gap:8px;align-items:center;padding:10px 0}
@@ -76,6 +83,18 @@ input[type=range]{width:90px}
   <label><input type="checkbox" id="tts" checked> 🔊 Чети</label>
 </div>
 <div class="row"><button id="go">🎤 Старт разговор</button></div>
+<div id="lg">
+  <div class="ovh"><b>👤 Вход</b><span style="flex:1"></span><button id="lx">✖</button></div>
+  <div class="lgb">
+    <button id="lgoogle">Вход с Google</button>
+    <div class="hd">или с имейл и парола (работи навсякъде)</div>
+    <input id="lem" type="email" placeholder="Имейл" autocomplete="email" autocapitalize="off">
+    <input id="lpw" type="password" placeholder="Парола (поне 6 символа)" autocomplete="current-password">
+    <div class="row"><button class="cal" id="lin">Вход</button><button class="cal" id="lup">Регистрация</button></div>
+    <button id="lrs">Забравена парола</button>
+    <div id="lmsg"></div>
+  </div>
+</div>
 <div id="ov">
   <div class="ovh"><b>📜 История</b><input id="hq" placeholder="🔍 Търси..."><button id="hx">✖</button></div>
   <div id="hl"></div>
@@ -540,13 +559,45 @@ async function syncCloud(){
   }catch(e){$("hst").textContent="⚠️ Облакът не отговаря"}
   renderH();
 }
-window.addEventListener("cloudauth",()=>{authUI();syncCloud()});
+window.addEventListener("cloudauth",()=>{authUI();if(window.cloud&&window.cloud.user)$("lg").classList.remove("on");syncCloud()});
+const ERR={
+  "auth/invalid-email":"Невалиден имейл.",
+  "auth/missing-password":"Въведи парола.",
+  "auth/weak-password":"Паролата трябва да е поне 6 символа.",
+  "auth/email-already-in-use":"Този имейл вече има профил. Натисни „Вход“, или „Забравена парола“, ако си влизал с Google.",
+  "auth/invalid-credential":"Грешен имейл или парола.",
+  "auth/user-not-found":"Няма профил с този имейл.",
+  "auth/wrong-password":"Грешна парола.",
+  "auth/popup-closed-by-user":"Прозорецът беше затворен.",
+  "auth/cancelled-popup-request":"Прозорецът беше затворен.",
+  "auth/account-exists-with-different-credential":"Този имейл е свързан с друг вид вход. Опитай с Google или с „Забравена парола“.",
+  "auth/network-request-failed":"Няма интернет.",
+  "auth/too-many-requests":"Твърде много опити. Опитай по-късно.",
+  "auth/unauthorized-domain":"Адресът не е разрешен във Firebase (Authorized domains).",
+  "auth/operation-not-allowed":"Този вид вход не е включен във Firebase."
+};
+const lmsg=t=>$("lmsg").textContent=t;
+async function doAuth(fn){
+  lmsg("⏳ Момент...");
+  try{await fn();return true}
+  catch(e){lmsg("⛔ "+(ERR[e.code]||e.code||e.message));return false}
+}
 $("login").onclick=async()=>{
   const c=window.cloud;
   if(!(c&&c.ok)){alert("Профилите още не са настроени в приложението.");return}
   if(c.user){if(confirm("Изход от "+(c.user.email||"профила")+"?"))await c.signOut();return}
-  try{await c.signIn()}
-  catch(e){alert("Не успях да вляза: "+(e.code||e.message)+"\nНа iPhone опитай от Safari (не от иконата на началния екран).")}
+  $("lg").classList.add("on");lmsg("");
+};
+$("lx").onclick=()=>$("lg").classList.remove("on");
+$("lgoogle").onclick=async()=>{
+  if(await doAuth(()=>window.cloud.signInGoogle()))lmsg("✅ Влязох");
+};
+$("lin").onclick=()=>doAuth(()=>window.cloud.emailIn($("lem").value.trim(),$("lpw").value));
+$("lup").onclick=()=>doAuth(()=>window.cloud.emailUp($("lem").value.trim(),$("lpw").value));
+$("lrs").onclick=async()=>{
+  const em=$("lem").value.trim();
+  if(!em){lmsg("Въведи имейла си най-горе.");return}
+  if(await doAuth(()=>window.cloud.reset(em)))lmsg("📧 Изпратих писмо за нова парола. Провери и в „Спам“.");
 };
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 authUI();
@@ -566,7 +617,17 @@ if(cfg&&cfg.apiKey){
     window.cloud={
       ok:true,
       get user(){return user},
-      signIn:()=>A.signInWithPopup(auth,new A.GoogleAuthProvider()),
+      signInGoogle:async()=>{
+        const p=new A.GoogleAuthProvider();
+        try{return await A.signInWithPopup(auth,p)}
+        catch(e){
+          if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment","auth/web-storage-unsupported"].includes(e.code))return A.signInWithRedirect(auth,p);
+          throw e;
+        }
+      },
+      emailIn:(e,p)=>A.signInWithEmailAndPassword(auth,e,p),
+      emailUp:(e,p)=>A.createUserWithEmailAndPassword(auth,e,p),
+      reset:e=>A.sendPasswordResetEmail(auth,e),
       signOut:()=>A.signOut(auth),
       save:async it=>{if(user)await F.setDoc(F.doc(db,"users",user.uid,"history",it.id),it)},
       del:async id=>{if(user)await F.deleteDoc(F.doc(db,"users",user.uid,"history",id))},
@@ -584,6 +645,7 @@ if(cfg&&cfg.apiKey){
         }
       }
     };
+    A.getRedirectResult(auth).catch(()=>{});
     A.onAuthStateChanged(auth,u=>{user=u;window.dispatchEvent(new Event("cloudauth"))});
   }catch(e){
     console.error(e);
