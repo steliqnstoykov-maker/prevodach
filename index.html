@@ -51,6 +51,33 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
 .bigmic{width:84px;height:84px;border-radius:50%;font-size:34px;background:#16a34a;padding:0;box-shadow:0 4px 16px #0006}
 .bigmic.on{background:#dc2626}
 /* екрани върху приложението */
+#hp,#pf{display:none;position:fixed;inset:0;background:#0b1220;z-index:55;flex-direction:column;padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom);overflow-y:auto}
+#hp.on,#pf.on{display:flex}
+.hpw{max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:24px}
+.buds{display:flex;gap:10px;align-items:stretch}
+.bud{flex:1;background:#1e293b;border-radius:18px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;border:2px solid transparent;min-width:0}
+.bud b,.bud select,.bud small{color:#f1f5f9}
+.bud b{font-size:15px}
+.bud select{width:100%;font-size:16px;padding:10px;background:#0f172a}
+.bud small{opacity:.7;min-height:18px;text-align:center}
+.bsv{width:70px;height:88px}
+#hpL{color:#3b82f6}
+#hpR{color:#22c55e}
+#hpR .bsv{transform:scaleX(-1)}
+.bud.listen{border-color:#93c5fd}
+.bud.talk{box-shadow:inset 0 0 0 3px #fbbf24}
+.bud.play{animation:pl .7s infinite alternate}
+@keyframes pl{from{background:#1e293b}to{background:#3b4a63}}
+.hsw{align-self:center;background:#1e293b;font-size:20px;padding:10px}
+#hpgo{padding:18px;font-size:20px;background:#16a34a}
+#hpgo.on{background:#dc2626}
+#hpst{min-height:26px;text-align:center;opacity:.9}
+.hpn{background:#1e293b;border-radius:12px;padding:10px 12px;font-size:14px;opacity:.95}
+.pfr{display:flex;justify-content:space-between;gap:12px;padding:12px 2px;border-bottom:1px solid #1e293b;font-size:16px}
+.pfr span:first-child{opacity:.65;white-space:nowrap}
+.pfr span:last-child{text-align:right;word-break:break-word}
+#pfav{width:84px;height:84px;border-radius:50%;margin:8px auto;display:block;background:#1e293b;object-fit:cover}
+#pfn{text-align:center;font-size:22px;font-weight:700}
 #ov,#st,#lg{display:none;position:fixed;inset:0;background:#0b1220;z-index:50;flex-direction:column;padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom);overflow-y:auto}
 #lg{z-index:60}
 #ov.on,#st.on,#lg.on{display:flex}
@@ -79,6 +106,7 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
     <b>Преводач S.S</b>
     <span class="sp"></span>
     <button class="ib" id="hist" title="История">📜</button>
+    <button class="ib" id="hpbtn" title="Слушалки">🎧</button>
     <button class="ib" id="login">👤 Вход</button>
     <button class="ib" id="sett" title="Настройки">⚙️</button>
   </header>
@@ -100,6 +128,44 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
       <button class="bigmic" id="go" title="Старт / Стоп">🎤</button>
       <button class="side" id="wB">B</button>
     </div>
+  </div>
+</div>
+<div id="hp">
+  <div class="ovh"><b>🎧 Превод през слушалки</b><span class="sp"></span><button id="hpx">✖</button></div>
+  <div class="hpw">
+    <div class="buds">
+      <div class="bud" id="hpL">
+        <svg class="bsv" viewBox="0 0 80 100"><ellipse cx="40" cy="38" rx="27" ry="31" fill="currentColor"/><rect x="48" y="52" width="14" height="42" rx="7" fill="currentColor"/><circle cx="34" cy="34" r="10" fill="#0b1220" opacity=".35"/></svg>
+        <b>Лява слушалка</b>
+        <select id="hA"></select>
+        <small>Човек A чува този език</small>
+      </div>
+      <button class="hsw" id="hsw" title="Размени">⇄</button>
+      <div class="bud" id="hpR">
+        <svg class="bsv" viewBox="0 0 80 100"><ellipse cx="40" cy="38" rx="27" ry="31" fill="currentColor"/><rect x="48" y="52" width="14" height="42" rx="7" fill="currentColor"/><circle cx="34" cy="34" r="10" fill="#0b1220" opacity=".35"/></svg>
+        <b>Дясна слушалка</b>
+        <select id="hB"></select>
+        <small>Човек B чува този език</small>
+      </div>
+    </div>
+    <div id="hpst"></div>
+    <button id="hpgo">▶️ Започни разговор</button>
+    <div class="row"><button class="cal" id="tL">🔔 Тест: лява</button><button class="cal" id="tR">🔔 Тест: дясна</button></div>
+    <label><input type="checkbox" id="hpSmart"> 🤖 Умен режим (познава кой говори по езика)</label>
+    <label><input type="checkbox" id="hpAuto"> 🧠 Разпознаване по глас</label>
+    <div class="hpn" id="hpn"></div>
+  </div>
+</div>
+<div id="pf">
+  <div class="ovh"><b>👤 Профил</b><span class="sp"></span><button id="pfx">✖</button></div>
+  <div class="hpw">
+    <img id="pfav" alt="" referrerpolicy="no-referrer">
+    <div id="pfn"></div>
+    <div id="pfrows"></div>
+    <button id="pfsync">☁️ Синхронизирай сега</button>
+    <button id="pfhist">📜 Отвори историята</button>
+    <button id="pfclr">🗑 Изтрий историята</button>
+    <button id="pfout">🚪 Изход</button>
   </div>
 </div>
 <div id="st">
@@ -157,14 +223,24 @@ const $=id=>document.getElementById(id);
 const SEL={A:$("A"),B:$("B")};
 LANGS.forEach((l,i)=>{for(const w of ["A","B"]){const o=document.createElement("option");o.value=i;o.textContent=l[2]+"  "+l[1];SEL[w].appendChild(o)}});
 SEL.A.value=localStorage.getItem("A")||1; SEL.B.value=localStorage.getItem("B")||0;
+for(const id of ["hA","hB"])LANGS.forEach((l,i)=>{const o=document.createElement("option");o.value=i;o.textContent=l[2]+"  "+l[1];$(id).appendChild(o)});
+$("hA").value=SEL.A.value;$("hB").value=SEL.B.value;
+$("hA").onchange=()=>{SEL.A.value=$("hA").value;langChanged()};
+$("hB").onchange=()=>{SEL.B.value=$("hB").value;langChanged()};
 const other=w=>w==="A"?"B":"A";
 const api=c=>c.startsWith("zh")?c:c.split("-")[0];
-const live=t=>$("live").textContent=t;
+const live=t=>{$("live").textContent=t;const h=$("hpst");if(h)h.textContent=t};
+function setGo(on){
+  $("go").textContent=on?"⏹":"🎤";$("go").classList.toggle("on",on);
+  const b=$("hpgo");if(b){b.textContent=on?"⏹ Спри разговора":"▶️ Започни разговор";b.classList.toggle("on",on)}
+  if(!on){hpMode=false;hpClear()}
+}
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let rec,running=false,busy=false,cur="A",tok=0,frames=[],checked=false,calibrating=false;
 let prof=JSON.parse(localStorage.getItem("prof")||"{}");
 let stream,ctx,an,td,fd,msrc,commitTimer,pending="",lastAct=0;
+let hpMode=false,pctx=null,rdelay=200,rstart=0;
 let proc=null,smartRun=false,sbusy=false,speaking=false,ring=[],chunks=[],lastVoice=0,startT=0,voicedMs=0,nf=0.005;
 
 function refreshCal(){
@@ -176,7 +252,7 @@ function refreshCal(){
   $("auto").disabled=!(prof.A&&prof.B);
   if($("auto").disabled)$("auto").checked=false;
 }
-function langChanged(){localStorage.setItem("A",SEL.A.value);localStorage.setItem("B",SEL.B.value);refreshCal()}
+function langChanged(){localStorage.setItem("A",SEL.A.value);localStorage.setItem("B",SEL.B.value);$("hA").value=SEL.A.value;$("hB").value=SEL.B.value;refreshCal()}
 SEL.A.onchange=SEL.B.onchange=langChanged;
 $("swap").onclick=()=>{[SEL.A.value,SEL.B.value]=[SEL.B.value,SEL.A.value];
   const p=prof.A;prof.A=prof.B;prof.B=p;localStorage.setItem("prof",JSON.stringify(prof));langChanged()};
@@ -289,9 +365,14 @@ function speak(text,lang){
     const u=new SpeechSynthesisUtterance(text);u.lang=lang;u.rate=parseFloat($("rate").value);
     const v=speechSynthesis.getVoices().find(v=>v.lang.replace("_","-").toLowerCase().startsWith(lang.split("-")[0].toLowerCase()));
     if(v)u.voice=v;
-    u.onend=u.onerror=()=>res();
-    speechSynthesis.cancel();speechSynthesis.speak(u);
-    setTimeout(res,25000);
+    let fin=false,w;
+    const done=()=>{if(fin)return;fin=true;clearInterval(w);res()};
+    u.onend=u.onerror=done;
+    if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+    const t0=Date.now();
+    w=setInterval(()=>{if(Date.now()-t0>1500&&!speechSynthesis.speaking&&!speechSynthesis.pending)done()},400);
+    setTimeout(done,25000);
   });
 }
 function addMsg(w,orig,tr,f,t){
@@ -329,10 +410,10 @@ function dedupe(t){
 function startRec(w){
   if(!running)return;
   clearInterval(commitTimer);
-  cur=w;frames=[];checked=false;pending="";lastAct=0;
+  cur=w;frames=[];checked=false;pending="";lastAct=0;rstart=Date.now();
   const lang=LANGS[SEL[w].value];
   const my=++tok;
-  $("wA").classList.toggle("act",w==="A");$("wB").classList.toggle("act",w==="B");
+  $("wA").classList.toggle("act",w==="A");$("wB").classList.toggle("act",w==="B");hpListen(w);
   live("🎤 Слушам "+lang[2]+" "+lang[1]+"...");
   rec=new SR();rec.lang=lang[0];rec.continuous=true;rec.interimResults=true;
   rec.onresult=e=>{
@@ -340,6 +421,7 @@ function startRec(w){
     const t=collect(e.results);
     if(!t)return;
     if(t!==pending){pending=t;lastAct=Date.now()}
+    rdelay=200;
     live(lang[2]+" "+t);
     // Проверка кой говори (само веднъж на изказване)
     if(!checked&&$("auto").checked&&frames.length>=12){
@@ -356,7 +438,10 @@ function startRec(w){
   rec.onend=()=>{
     if(my!==tok)return;
     if(pending&&!busy){const t=pending;pending="";clearInterval(commitTimer);handle(t,cur);return}
-    if(running&&!busy)setTimeout(()=>startRec(cur),200);
+    if(running&&!busy){
+      rdelay=(Date.now()-rstart<1500)?Math.min(2500,Math.max(400,rdelay*2)):200;
+      setTimeout(()=>startRec(cur),rdelay);
+    }
   };
   rec.onerror=e=>{
     if(my!==tok)return;
@@ -376,6 +461,7 @@ function startRec(w){
 }
 async function handle(text,spk){
   text=dedupe(text);
+  hpTalk(spk,true);
   busy=true;tok++;clearInterval(commitTimer);try{rec.abort()}catch(_){}
   const f=LANGS[SEL[spk].value],t=LANGS[SEL[other(spk)].value];
   live("⏳ Превеждам...");
@@ -383,8 +469,9 @@ async function handle(text,spk){
     const tr=await translate(text,f[0],t[0]);
     addMsg(spk,text,tr,f,t);
     live("🔊");
-    await speak(tr,t[0]);
+    await speakOut(tr,t[0],other(spk));
   }catch(e){live("Грешка при превода (проверете интернет).")}
+  hpTalk(spk,false);
   busy=false;live("");
   const nxt=($("auto").checked||$("alt").checked)?other(spk):spk;
   if(running)startRec(nxt);
@@ -395,7 +482,7 @@ function stop(){
   try{rec.abort()}catch(_){}
   if(proc){try{msrc.disconnect(proc);proc.disconnect()}catch(_){}proc=null}
   speechSynthesis.cancel();busy=false;sbusy=false;speaking=false;ring=[];chunks=[];
-  $("go").textContent="🎤";$("go").classList.remove("on");live("");
+  setGo(false);live("");
   $("wA").classList.remove("act");$("wB").classList.remove("act");
 }
 
@@ -473,12 +560,15 @@ async function finishUtter(){
       const tr=await translate(text,f[0],t[0]);
       addMsg(who||"B",text,tr,f,t);
       live("🔊");
-      await speak(tr,t[0]);
+      hpTalk(who,true);
+      await speakOut(tr,t[0],who?other(who):"A");
+      hpTalk(who,false);
     }
   }catch(e){
     live(e.message==="401"?"⛔ Грешен OpenAI ключ - натисни 🔑.":e.message==="429"?"⛔ Няма кредит или лимитът е изчерпан в OpenAI.":"⚠️ Грешка: "+e.message);
     await sleep(2500);
   }
+  hpMark("A","talk",false);hpMark("B","talk",false);
   await sleep(400);
   if(smartRun){ring=[];speaking=false;sbusy=false;live("🎤 Слушам автоматично...")}
 }
@@ -489,7 +579,7 @@ async function smartBegin(){
   proc=ctx.createScriptProcessor(4096,1,1);
   proc.onaudioprocess=onAudio;
   msrc.connect(proc);proc.connect(ctx.destination);
-  $("go").textContent="⏹";$("go").classList.add("on");
+  setGo(true);
   speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   live("🎤 Слушам автоматично...");
 }
@@ -499,7 +589,7 @@ async function begin(w){
   if(!SR){alert("Този браузър не поддържа разпознаване на реч. Ползвай Chrome или Safari.");return}
   if($("auto").checked&&!(await initMic()))return;
   running=true;busy=false;
-  $("go").textContent="⏹";$("go").classList.add("on");
+  setGo(true);
   speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   startRec(w);
 }
@@ -577,6 +667,116 @@ $("hclr").onclick=async()=>{
   if(inCloud){try{await c.clear()}catch(_){}}
   renderH();
 };
+// ---------- Режим със слушалки ----------
+// Лява слушалка = човек A (първи език), дясна = човек B (втори език).
+// Преводът на говорещия се пуска в слушалката на СЛУШАЩИЯ.
+const sideOf=w=>w==="A"?"L":"R";
+const budOf=w=>$(w==="A"?"hpL":"hpR");
+function hpClear(){["hpL","hpR"].forEach(i=>$(i).classList.remove("listen","talk","play"))}
+function hpMark(w,cls,on){const e=w&&budOf(w);if(e)e.classList.toggle(cls,on)}
+function hpListen(w){if(!hpMode)return;hpMark("A","listen",w==="A");hpMark("B","listen",w==="B")}
+function hpTalk(w,on){if(hpMode&&w)hpMark(w,"talk",on)}
+function hpNote(t){$("hpn").textContent=t}
+function unlockAudio(){
+  if(!pctx)pctx=new (window.AudioContext||window.webkitAudioContext)();
+  if(pctx.resume){try{const pr=pctx.resume();if(pr&&pr.catch)pr.catch(()=>{})}catch(_){}}
+  try{const b=pctx.createBuffer(1,1,22050),s=pctx.createBufferSource();s.buffer=b;s.connect(pctx.destination);s.start(0)}catch(_){}
+}
+function routeTo(node,side){
+  const m=pctx.createChannelMerger(2);
+  node.connect(m,0,side==="L"?0:1);
+  m.connect(pctx.destination);
+}
+function playBuf(buf,side,w){
+  return new Promise(res=>{
+    const src=pctx.createBufferSource();src.buffer=buf;
+    const g=pctx.createGain();src.connect(g);routeTo(g,side);
+    if(w)hpMark(w,"play",true);
+    try{if(navigator.audioSession)navigator.audioSession.type="playback"}catch(_){}
+    const done=()=>{if(w)hpMark(w,"play",false);try{if(navigator.audioSession)navigator.audioSession.type="auto"}catch(_){}res()};
+    src.onended=done;src.start();
+    setTimeout(done,60000);
+  });
+}
+function tone(side){
+  unlockAudio();
+  const o=pctx.createOscillator(),g=pctx.createGain();
+  o.frequency.value=side==="L"?523:659;g.gain.value=0.2;
+  o.connect(g);routeTo(g,side);o.start();o.stop(pctx.currentTime+0.7);
+  const w=side==="L"?"A":"B";hpMark(w,"play",true);setTimeout(()=>hpMark(w,"play",false),750);
+}
+async function speakEar(text,lang,listener){
+  const key=localStorage.getItem("oaikey");
+  if(!key){
+    hpNote("⚠️ Без OpenAI ключ браузърът не може да раздели каналите - преводът се чува и в двете слушалки. Сложи ключа от ⚙️ Настройки › 🔑.");
+    return speak(text,lang);
+  }
+  try{
+    unlockAudio();
+    const r=await fetch("https://api.openai.com/v1/audio/speech",{method:"POST",
+      headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},
+      body:JSON.stringify({model:"tts-1",voice:"alloy",input:text,response_format:"mp3",speed:parseFloat($("rate").value)})});
+    if(!r.ok)throw new Error(String(r.status));
+    const buf=await pctx.decodeAudioData(await r.arrayBuffer());
+    hpNote("🎧 Преводът се пуска само в "+(sideOf(listener)==="L"?"лявата":"дясната")+" слушалка.");
+    await playBuf(buf,sideOf(listener),listener);
+  }catch(e){
+    hpNote("⚠️ Гласът през OpenAI не се получи ("+e.message+"). Преводът се чува в двете слушалки.");
+    await speak(text,lang);
+  }
+}
+function speakOut(text,lang,listener){return hpMode?speakEar(text,lang,listener):speak(text,lang)}
+
+$("hpbtn").onclick=()=>{
+  $("hp").classList.add("on");
+  $("hA").value=SEL.A.value;$("hB").value=SEL.B.value;
+  $("hpSmart").checked=$("smart").checked;
+  $("hpAuto").checked=$("auto").checked;$("hpAuto").disabled=$("auto").disabled;
+  hpNote(localStorage.getItem("oaikey")
+    ?"✅ Разделянето на каналите е възможно (OpenAI глас). Направи теста на слушалките преди разговор."
+    :"ℹ️ За истинско разделяне лява/дясна слушалка е нужен OpenAI ключ (⚙️ Настройки › 🔑). Без него преводът се чува и в двете слушалки.");
+};
+$("hpx").onclick=()=>$("hp").classList.remove("on");
+$("hsw").onclick=()=>$("swap").click();
+$("hpSmart").onchange=()=>{$("smart").checked=$("hpSmart").checked;$("smart").onchange();$("hpSmart").checked=$("smart").checked};
+$("hpAuto").onchange=()=>{$("auto").checked=$("hpAuto").checked;if($("auto").onchange)$("auto").onchange()};
+$("tL").onclick=()=>tone("L");
+$("tR").onclick=()=>tone("R");
+$("hpgo").onclick=async()=>{
+  if(running){stop();return}
+  unlockAudio();hpMode=true;
+  await begin("A");
+  if(!running)hpMode=false;
+};
+
+// ---------- Профил ----------
+function openProfile(){
+  const c=window.cloud,u=c&&c.user;if(!u)return;
+  $("pf").classList.add("on");
+  const av=$("pfav");
+  if(u.photoURL){av.src=u.photoURL;av.style.display="block"}else{av.removeAttribute("src");av.style.display="none"}
+  $("pfn").textContent=u.displayName||(u.email||"Профил").split("@")[0];
+  const prov=(u.providerData||[]).map(x=>x.providerId==="google.com"?"Google":x.providerId==="password"?"Имейл и парола":x.providerId);
+  const fmt=v=>{try{return new Date(v).toLocaleDateString("bg-BG",{day:"numeric",month:"long",year:"numeric"})}catch(_){return v||"-"}};
+  const rows=[["✉️ Имейл",u.email||"-"],["🔐 Вход чрез",prov.join(", ")||"-"],
+    ["📅 Профил от",fmt(u.metadata&&u.metadata.creationTime)],["🕒 Последен вход",fmt(u.metadata&&u.metadata.lastSignInTime)],
+    ["📜 Записи в историята",String(getH().length)],["☁️ Облак",$("hst").textContent||"включен"]];
+  const box=$("pfrows");box.innerHTML="";
+  rows.forEach(r=>{const d=document.createElement("div");d.className="pfr";d.innerHTML="<span></span><span></span>";d.children[0].textContent=r[0];d.children[1].textContent=r[1];box.appendChild(d)});
+}
+$("pfx").onclick=()=>$("pf").classList.remove("on");
+$("pfsync").onclick=async()=>{await syncCloud();openProfile()};
+$("pfhist").onclick=()=>{$("pf").classList.remove("on");$("hist").click()};
+$("pfclr").onclick=async()=>{
+  const c=window.cloud;
+  if(!confirm("Да изтрия цялата история от това устройство и от профила?"))return;
+  setH([]);if(c&&c.user){try{await c.clear()}catch(_){}}
+  openProfile();
+};
+$("pfout").onclick=async()=>{
+  if(confirm("Изход от профила?")){await window.cloud.signOut();$("pf").classList.remove("on")}
+};
+
 function authUI(){
   const u=window.cloud&&window.cloud.user;
   $("login").textContent=u?("👤 "+((u.displayName||u.email||"Профил").split(" ")[0])):"👤 Вход";
@@ -622,7 +822,7 @@ async function doAuth(fn){
 $("login").onclick=async()=>{
   const c=window.cloud;
   if(!(c&&c.ok)){alert("Профилите още не са настроени в приложението.");return}
-  if(c.user){if(confirm("Изход от "+(c.user.email||"профила")+"?"))await c.signOut();return}
+  if(c.user){openProfile();return}
   $("lg").classList.add("on");lmsg("");
 };
 $("lx").onclick=()=>$("lg").classList.remove("on");
