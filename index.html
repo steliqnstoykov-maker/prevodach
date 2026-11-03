@@ -8,6 +8,19 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0f172a">
+<script>
+window.__errs=[];
+window.addEventListener("error",function(e){window.__errs.push((e.message||"грешка")+(e.lineno?" (ред "+e.lineno+")":""))});
+window.addEventListener("unhandledrejection",function(e){window.__errs.push("promise: "+String((e.reason&&e.reason.message)||e.reason))});
+window.addEventListener("load",function(){setTimeout(function(){
+  if(window.__errs.length){
+    var d=document.createElement("div");
+    d.style.cssText="position:fixed;top:0;left:0;right:0;z-index:99;background:#7f1d1d;color:#fff;padding:8px 12px;font:13px sans-serif";
+    d.textContent="⚠️ Грешка в приложението: "+window.__errs.slice(-2).join(" | ")+" (направи снимка и я прати; докосни, за да затвориш)";
+    d.onclick=function(){d.remove()};document.body.appendChild(d);
+  }
+},800)});
+</script>
 <script src="firebase-config.js"></script>
 <title>Преводач S.S</title>
 <style>
@@ -25,8 +38,9 @@ input[type=range]{flex:1;min-width:80px}
 /* горна лента */
 .bar{display:flex;align-items:center;gap:8px;padding:10px 0 6px}
 .bar img{width:30px;height:30px;border-radius:8px}
-.bar b{font-size:20px}
-.ib{padding:8px 12px;background:#1e293b;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar b{font-size:20px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:430px){.bar img{display:none}.bar b{font-size:17px}.ib{padding:8px 10px}#login{max-width:104px}}
+.ib{padding:8px 12px;background:#1e293b;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 .langs{display:flex;gap:8px;align-items:center;padding:4px 0 10px}
 #swap{background:#1e293b;font-size:20px}
 /* разговор */
@@ -77,6 +91,25 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
 .pfr span:first-child{opacity:.65;white-space:nowrap}
 .pfr span:last-child{text-align:right;word-break:break-word}
 #pfav{width:84px;height:84px;border-radius:50%;margin:8px auto;display:block;background:#1e293b;object-fit:cover}
+#diag{display:none;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.5;background:#1e293b;border-radius:12px;padding:10px;margin:6px 0}
+#iab{background:#78350f;color:#fff;border-radius:12px;padding:10px 12px;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}
+#iab[hidden]{display:none}
+#iab span{flex:1;min-width:200px}
+#iab button{padding:6px 10px;font-size:13px}
+#lock{display:none;position:fixed;inset:0;background:#0b1220;z-index:58;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
+#lock.on{display:flex}
+.lkb{display:flex;flex-direction:column;gap:12px;max-width:380px;width:100%;align-items:stretch}
+.lkb img{width:84px;height:84px;border-radius:20px;margin:0 auto}
+.lkb b{font-size:22px}
+#lkmsg{opacity:.92;line-height:1.45}
+#lkhint{background:#78350f;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4}
+#lock button[hidden],#lkhint[hidden]{display:none}
+#inv{display:none;position:fixed;inset:0;background:#0b1220;z-index:56;flex-direction:column;padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom);overflow-y:auto}
+#inv.on{display:flex}
+#inv input{font-size:17px;padding:14px;border-radius:12px;border:0;background:#1e293b;color:#f1f5f9}
+#invmsg{min-height:22px;opacity:.9}
+#adm{display:flex;flex-direction:column;gap:4px;border-left:3px solid #fbbf24;padding-left:10px;margin-top:8px}
+#adm[hidden],#hpSmartRow[hidden],#pfinv[hidden]{display:none}
 #pfn{text-align:center;font-size:22px;font-weight:700}
 #ov,#st,#lg{display:none;position:fixed;inset:0;background:#0b1220;z-index:50;flex-direction:column;padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom);overflow-y:auto}
 #lg{z-index:60}
@@ -110,6 +143,11 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
     <button class="ib" id="login">👤 Вход</button>
     <button class="ib" id="sett" title="Настройки">⚙️</button>
   </header>
+  <div id="iab" hidden>
+    <span>ℹ️ Отворено е във вътрешния браузър (Messenger и др.). Гласът не работи тук. Докосни ••• горе вдясно и избери „Отвори в Safari“.</span>
+    <button id="iabc">📋 Копирай линка</button>
+    <button id="iabx">✖</button>
+  </div>
   <div class="langs">
     <select id="A"></select>
     <button id="swap" title="Размени">⇄</button>
@@ -151,7 +189,7 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
     <div id="hpst"></div>
     <button id="hpgo">▶️ Започни разговор</button>
     <div class="row"><button class="cal" id="tL">🔔 Тест: лява</button><button class="cal" id="tR">🔔 Тест: дясна</button></div>
-    <label><input type="checkbox" id="hpSmart"> 🤖 Умен режим (познава кой говори по езика)</label>
+    <label id="hpSmartRow"><input type="checkbox" id="hpSmart"> 🤖 Умен режим (познава кой говори по езика)</label>
     <label><input type="checkbox" id="hpAuto"> 🧠 Разпознаване по глас</label>
     <div class="hpn" id="hpn"></div>
   </div>
@@ -165,6 +203,7 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
     <button id="pfsync">☁️ Синхронизирай сега</button>
     <button id="pfhist">📜 Отвори историята</button>
     <button id="pfclr">🗑 Изтрий историята</button>
+    <button id="pfinv" hidden>👑 Покани приятели</button>
     <button id="pfout">🚪 Изход</button>
   </div>
 </div>
@@ -179,11 +218,42 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
     <div class="hd">Разпознаване по глас</div>
     <div class="row"><button class="cal" id="cA">🎙 Глас A</button><button class="cal" id="cB">🎙 Глас B</button></div>
     <label><input type="checkbox" id="auto"> 🧠 Включи разпознаване по глас</label>
-    <div class="hd">Умен режим (автоматичен език)</div>
-    <label><input type="checkbox" id="smart"> 🤖 Включи умен режим</label>
-    <button id="key">🔑 OpenAI ключ</button>
     <div class="hd">Други</div>
     <button id="clr">🗑 Изчисти екрана</button>
+    <div id="adm" hidden>
+      <div class="hd">👑 Администратор</div>
+      <label><input type="checkbox" id="smart"> 🤖 Умен режим (автоматичен език)</label>
+      <button id="key">🔑 OpenAI ключ</button>
+      <button id="keydel">🗑 Изтрий ключа</button>
+      <button id="diagbtn">🩺 Проверка на връзката</button>
+      <pre id="diag"></pre>
+      <div class="hd" id="ver"></div>
+    </div>
+  </div>
+</div>
+<div id="lock" class="on">
+  <div class="lkb">
+    <img src="icon-192.png" alt="">
+    <b>Преводач S.S</b>
+    <div id="lkmsg">⏳ Проверявам достъпа...</div>
+    <div id="lkhint" hidden>ℹ️ Отворено е във вътрешен браузър (Messenger и др.). Google не позволява вход оттук. Докосни ••• горе вдясно › „Отвори в Safari“ и влез там.</div>
+    <button id="lkcp" hidden>📋 Копирай линка</button>
+    <button id="lkin" hidden>👤 Вход</button>
+    <button id="lkv" hidden>📧 Изпрати писмо за потвърждение</button>
+    <button id="lkc" hidden>✅ Потвърдих имейла</button>
+    <button id="lkr" hidden>🔄 Опитай пак</button>
+    <button id="lkout" hidden>🚪 Изход</button>
+  </div>
+</div>
+<div id="inv">
+  <div class="ovh"><b>👑 Покани</b><span class="sp"></span><button id="invx">✖</button></div>
+  <div class="hpw">
+    <div class="hpn">Само хората от списъка (и ти) могат да ползват приложението. Поканата важи за имейла, с който влизат в Google.</div>
+    <input id="invem" type="email" placeholder="имейл на приятел" autocapitalize="off" autocomplete="off">
+    <button id="invadd">➕ Добави покана</button>
+    <div id="invmsg"></div>
+    <div id="invlist"></div>
+    <button id="invlink">📋 Копирай линка на приложението</button>
   </div>
 </div>
 <div id="lg">
@@ -206,7 +276,7 @@ textarea{flex:1;min-width:0;font-size:17px;padding:10px;border-radius:14px;borde
 <script>
 // [речев код, име, знаме] - първите пет са по избран ред
 const LANGS=[
-["en-US","English","🇬🇧"],["bg-BG","Български","🇧🇬"],["ru-RU","Русский","🇷🇺"],["uk-UA","Українська","🇺🇦"],["tr-TR","Türkçe","🇹🇷"],
+["en-US","English","🇬🇧"],["bg-BG","Български","🇧🇬"],["ru-RU","Русский","🇷🇺"],["uk-UA","Українська","🇺🇦"],["tr-TR","Türkçe","🇹🇷"],["ne-NP","नेपाली","🇳🇵"],
 ["af-ZA","Afrikaans","🇿🇦"],["sq-AL","Shqip","🇦🇱"],["ar-SA","العربية","🇸🇦"],["hy-AM","Հայերեն","🇦🇲"],["az-AZ","Azərbaycan","🇦🇿"],
 ["be-BY","Беларуская","🇧🇾"],["bn-BD","বাংলা","🇧🇩"],["bs-BA","Bosanski","🇧🇦"],["ca-ES","Català","🇪🇸"],["zh-CN","中文","🇨🇳"],
 ["hr-HR","Hrvatski","🇭🇷"],["cs-CZ","Čeština","🇨🇿"],["da-DK","Dansk","🇩🇰"],["nl-NL","Nederlands","🇳🇱"],["et-EE","Eesti","🇪🇪"],
@@ -222,6 +292,8 @@ const LANGS=[
 const $=id=>document.getElementById(id);
 const SEL={A:$("A"),B:$("B")};
 LANGS.forEach((l,i)=>{for(const w of ["A","B"]){const o=document.createElement("option");o.value=i;o.textContent=l[2]+"  "+l[1];SEL[w].appendChild(o)}});
+// Непалски е вмъкнат като 6-и език: пренася вече запазените избори
+try{if(!localStorage.getItem("ne6")){for(const k of ["A","B"]){const v=localStorage.getItem(k);if(v!==null&&+v>=5)localStorage.setItem(k,String(+v+1))}localStorage.setItem("ne6","1")}}catch(_){}
 SEL.A.value=localStorage.getItem("A")||1; SEL.B.value=localStorage.getItem("B")||0;
 for(const id of ["hA","hB"])LANGS.forEach((l,i)=>{const o=document.createElement("option");o.value=i;o.textContent=l[2]+"  "+l[1];$(id).appendChild(o)});
 $("hA").value=SEL.A.value;$("hB").value=SEL.B.value;
@@ -270,7 +342,7 @@ async function initMic(){
     td=new Float32Array(an.fftSize);fd=new Float32Array(an.frequencyBinCount);
     setInterval(sample,50);
     return true;
-  }catch(e){alert("Няма достъп до микрофона. Разреши го от иконата до адреса.");return false}
+  }catch(e){alert(inApp?"Микрофонът не е достъпен във вътрешния браузър. Докосни ••• › Отвори в Safari.":"Няма достъп до микрофона. Разреши го от иконата до адреса.");return false}
 }
 function pitch(buf,sr){
   const n=buf.length,minLag=Math.floor(sr/400),maxLag=Math.floor(sr/70);
@@ -345,20 +417,27 @@ $("cA").onclick=()=>calibrate("A");
 $("cB").onclick=()=>calibrate("B");
 
 // ---------- Превод ----------
+const VER="v12";
+const tmo=(p,ms)=>Promise.race([p,new Promise((_,rj)=>setTimeout(()=>rj(new Error("времето за отговор изтече")),ms))]);
+const nice=e=>/Load failed|Failed to fetch|NetworkError/i.test(String(e&&e.message))?"няма достъп до услугата (мрежа, VPN или блокер)":String((e&&e.message)||e);
 async function gt(text,f,t){
   const u="https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl="+api(f)+"&tl="+api(t)+"&q="+encodeURIComponent(text);
-  const r=await fetch(u);if(!r.ok)throw new Error("gt");
+  const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);
   const j=await r.json();return j[0].map(x=>x[0]).join("");
 }
 async function mm(text,f,t){
   const u="https://api.mymemory.translated.net/get?q="+encodeURIComponent(text)+"&langpair="+api(f)+"|"+api(t);
-  const j=await(await fetch(u)).json();
+  const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);
+  const j=await r.json();
   const s=j.responseData.translatedText;
-  if(/MYMEMORY WARNING/i.test(s))throw new Error("mm");
+  if(/MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(s))throw new Error("дневният лимит е изчерпан");
   return s;
 }
 async function translate(text,f,t){
-  try{return await gt(text,f,t)}catch(_){return await mm(text,f,t)}
+  const why=[];
+  try{return await tmo(gt(text,f,t),8000)}catch(e){why.push("Google: "+nice(e))}
+  try{return await tmo(mm(text,f,t),8000)}catch(e){why.push("MyMemory: "+nice(e))}
+  throw new Error(why.join(" | "));
 }
 function speak(text,lang){
   return new Promise(res=>{
@@ -447,7 +526,7 @@ function startRec(w){
     if(my!==tok)return;
     if(e.error==="not-allowed"||e.error==="service-not-allowed"){
       stop();
-      live("⛔ Няма достъп до гласово разпознаване. На iPhone: отвори сайта в Safari (не от иконата) и включи Настройки › Общи › Клавиатура › Диктовка. Или ползвай 🤖 Умен режим.");
+      live(inApp?"⛔ Гласът не работи във вътрешния браузър (Messenger и др.). Докосни ••• горе вдясно › „Отвори в Safari“.":"⛔ Няма достъп до гласово разпознаване. На iPhone: отвори сайта в Safari (не от иконата) и включи Настройки › Общи › Клавиатура › Диктовка. Или ползвай 🤖 Умен режим.");
     }else if(e.error==="audio-capture"){stop();live("⛔ Не намирам микрофон.")}
     else if(e.error==="language-not-supported"){stop();live("⛔ Този език не се поддържа за говор на това устройство.")}
     else if(e.error==="network"){live("⚠️ Няма връзка за разпознаване на реч.")}
@@ -470,7 +549,7 @@ async function handle(text,spk){
     addMsg(spk,text,tr,f,t);
     live("🔊");
     await speakOut(tr,t[0],other(spk));
-  }catch(e){live("Грешка при превода (проверете интернет).")}
+  }catch(e){live("⚠️ Преводът не мина: "+(e&&e.message||e))}
   hpTalk(spk,false);
   busy=false;live("");
   const nxt=($("auto").checked||$("alt").checked)?other(spk):spk;
@@ -488,8 +567,14 @@ function stop(){
 
 // ---------- Умен режим: автоматичен език чрез OpenAI Whisper ----------
 function askKey(){
-  const k=prompt("Постави своя OpenAI ключ (започва с sk-). Той остава само в този браузър.");
-  if(k&&k.trim().startsWith("sk-")){localStorage.setItem("oaikey",k.trim());return true}
+  const k=prompt("Постави своя OpenAI ключ (започва с sk-). Той остава в този браузър.");
+  if(k&&k.trim().startsWith("sk-")){
+    localStorage.setItem("oaikey",k.trim());
+    if(gate.owner&&window.cloud&&window.cloud.user&&confirm("Да запазя ключа и в профила ти (за другите ти устройства)?")){
+      window.cloud.adminSave({oaikey:k.trim()}).catch(()=>alert("Не успях да го запиша в профила. Остава само на това устройство."));
+    }
+    return true;
+  }
   return false;
 }
 $("key").onclick=askKey;
@@ -616,7 +701,7 @@ async function sendText(from){
     $("txt").value="";
     live("");
     if($("tts").checked&&!running)await speak(tr,t[0]);
-  }catch(e){live("Грешка при превода (проверете интернет).")}
+  }catch(e){live("⚠️ Преводът не мина: "+(e&&e.message||e))}
 }
 $("sA").onclick=()=>sendText("A");
 $("sB").onclick=()=>sendText("B");
@@ -708,7 +793,7 @@ function tone(side){
 async function speakEar(text,lang,listener){
   const key=localStorage.getItem("oaikey");
   if(!key){
-    hpNote("⚠️ Без OpenAI ключ браузърът не може да раздели каналите - преводът се чува и в двете слушалки. Сложи ключа от ⚙️ Настройки › 🔑.");
+    hpNote(isAdmin()?"⚠️ Без OpenAI ключ браузърът не може да раздели каналите - преводът се чува и в двете слушалки. Сложи ключа от ⚙️ Настройки › 🔑.":"ℹ️ Преводът се чува и в двете слушалки.");
     return speak(text,lang);
   }
   try{
@@ -734,7 +819,7 @@ $("hpbtn").onclick=()=>{
   $("hpAuto").checked=$("auto").checked;$("hpAuto").disabled=$("auto").disabled;
   hpNote(localStorage.getItem("oaikey")
     ?"✅ Разделянето на каналите е възможно (OpenAI глас). Направи теста на слушалките преди разговор."
-    :"ℹ️ За истинско разделяне лява/дясна слушалка е нужен OpenAI ключ (⚙️ Настройки › 🔑). Без него преводът се чува и в двете слушалки.");
+    :(isAdmin()?"ℹ️ За истинско разделяне лява/дясна слушалка е нужен OpenAI ключ (⚙️ Настройки › 🔑). Без него преводът се чува и в двете слушалки.":"ℹ️ Преводът се чува в слушалките на телефона ти. Разделянето лява/дясна слушалка е в администраторския профил."));
 };
 $("hpx").onclick=()=>$("hp").classList.remove("on");
 $("hsw").onclick=()=>$("swap").click();
@@ -759,7 +844,7 @@ function openProfile(){
   const prov=(u.providerData||[]).map(x=>x.providerId==="google.com"?"Google":x.providerId==="password"?"Имейл и парола":x.providerId);
   const fmt=v=>{try{return new Date(v).toLocaleDateString("bg-BG",{day:"numeric",month:"long",year:"numeric"})}catch(_){return v||"-"}};
   const rows=[["✉️ Имейл",u.email||"-"],["🔐 Вход чрез",prov.join(", ")||"-"],
-    ["📅 Профил от",fmt(u.metadata&&u.metadata.creationTime)],["🕒 Последен вход",fmt(u.metadata&&u.metadata.lastSignInTime)],
+    ["🛡 Роля",gate.owner?"👑 Администратор":"Потребител"],["📅 Профил от",fmt(u.metadata&&u.metadata.creationTime)],["🕒 Последен вход",fmt(u.metadata&&u.metadata.lastSignInTime)],
     ["📜 Записи в историята",String(getH().length)],["☁️ Облак",$("hst").textContent||"включен"]];
   const box=$("pfrows");box.innerHTML="";
   rows.forEach(r=>{const d=document.createElement("div");d.className="pfr";d.innerHTML="<span></span><span></span>";d.children[0].textContent=r[0];d.children[1].textContent=r[1];box.appendChild(d)});
@@ -775,6 +860,145 @@ $("pfclr").onclick=async()=>{
 };
 $("pfout").onclick=async()=>{
   if(confirm("Изход от профила?")){await window.cloud.signOut();$("pf").classList.remove("on")}
+};
+
+// ---------- Вътрешен браузър (Messenger, Facebook, Instagram...) ----------
+const UA=navigator.userAgent;
+const inApp=/FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger|Line\/|MicroMessenger|Snapchat|TikTok|LinkedInApp|Twitter|; wv\)/i.test(UA)||(/iPhone|iPad|iPod/.test(UA)&&!/Safari|CriOS|FxiOS|EdgiOS/.test(UA)&&!navigator.standalone);
+if(inApp)$("iab").hidden=false;
+$("iabx").onclick=()=>{$("iab").hidden=true};
+$("iabc").onclick=async()=>{
+  const u=location.href.split("#")[0];
+  try{await navigator.clipboard.writeText(u);$("iabc").textContent="✅ Копирано"}
+  catch(_){prompt("Копирай линка и го постави в Safari:",u)}
+};
+
+// ---------- Проверка на връзката ----------
+async function runDiag(){
+  const out=[],box=$("diag");box.style.display="block";
+  const add=t=>{out.push(t);box.textContent=out.join("\n")};
+  add("Версия: "+VER+(navigator.standalone?" (икона на началния екран)":" (браузър)"));
+  add("Връзка: "+(navigator.onLine?"✅ онлайн":"❌ офлайн"));
+  add("Браузър: "+navigator.userAgent.replace(/Mozilla\/5\.0 /,"").slice(0,80));
+  add("Вътрешен браузър: "+(inApp?"⚠️ да (гласът не работи тук)":"не"));
+  add("Роля: "+(isAdmin()?"👑 администратор":"потребител"));
+  add("Грешки в страницата: "+((window.__errs&&window.__errs.length)?("❌ "+window.__errs.slice(-3).join(" | ")):"✅ няма"));
+  try{localStorage.setItem("t","1");localStorage.removeItem("t");add("Памет на браузъра: ✅")}catch(e){add("Памет на браузъра: ❌ "+e.message)}
+  let t0=Date.now();
+  try{const r=await tmo(gt("здравей","bg-BG","en-US"),8000);add('Превод Google: ✅ "'+r+'" ('+(Date.now()-t0)+" мс)")}catch(e){add("Превод Google: ❌ "+nice(e))}
+  try{const r=await tmo(mm("здравей","bg-BG","en-US"),8000);add('Превод MyMemory: ✅ "'+r+'"')}catch(e){add("Превод MyMemory: ❌ "+nice(e))}
+  add("Гласово разпознаване: "+(SR?"✅ има":"❌ няма в този браузър"));
+  add("Гласово четене: "+(window.speechSynthesis?("✅ гласове: "+speechSynthesis.getVoices().length):"❌ няма"));
+  try{const st=await tmo(navigator.mediaDevices.getUserMedia({audio:true}),10000);st.getTracks().forEach(x=>x.stop());add("Микрофон: ✅")}catch(e){add("Микрофон: ❌ "+(e.name||e.message))}
+  add("Service worker: "+(navigator.serviceWorker&&navigator.serviceWorker.controller?"активен":"няма"));
+  const c=window.cloud;
+  add("Профил: "+(c?(c.ok?(c.user?"✅ влязъл":"✅ готов, не си влязъл"):"❌ грешка при зареждане"):"❌ не е заредена конфигурацията"));
+}
+$("diagbtn").onclick=runDiag;
+$("ver").textContent="Версия "+VER;
+
+// ---------- Достъп само с покана и роля администратор ----------
+let gate={ok:false,owner:false};
+const fbOn=()=>!!(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.apiKey);
+const isAdmin=()=>gate.owner||!fbOn();
+function applyAdminUI(){
+  const a=isAdmin();
+  $("adm").hidden=!a;
+  $("hpSmartRow").hidden=!a;
+  $("pfinv").hidden=!gate.owner;
+  if(!a&&$("smart").checked)$("smart").checked=false;
+}
+function lockUI(msg,show){
+  $("lock").classList.add("on");
+  $("lkmsg").textContent=msg;
+  for(const id of ["lkin","lkv","lkc","lkr","lkout"])$(id).hidden=!show.includes(id);
+  $("lkhint").hidden=!inApp;$("lkcp").hidden=!inApp;
+}
+const unlock=()=>$("lock").classList.remove("on");
+const okCache={
+  set(){try{localStorage.setItem("okuntil",String(Date.now()+7*864e5))}catch(_){}},
+  has(){try{return Date.now()<Number(localStorage.getItem("okuntil")||0)}catch(_){return false}}
+};
+async function loadAdmin(){
+  try{
+    const d=await window.cloud.adminLoad();
+    if(d&&d.oaikey&&!localStorage.getItem("oaikey"))localStorage.setItem("oaikey",d.oaikey);
+  }catch(_){}
+}
+async function applyGate(){
+  if(!fbOn()){gate={ok:true,owner:false};applyAdminUI();unlock();return}
+  const c=window.cloud;
+  if(!c)return;
+  if(!c.ok){
+    if(okCache.has()){gate.ok=true;applyAdminUI();unlock();return}
+    gate={ok:false,owner:false};applyAdminUI();
+    lockUI("⚠️ Не мога да проверя достъпа (няма връзка?).",["lkr"]);return;
+  }
+  if(!c.user){gate={ok:false,owner:false};applyAdminUI();lockUI("🔒 Достъпът е само с покана. Влез с акаунта, за който имаш покана.",["lkin"]);return}
+  lockUI("⏳ Проверявам достъпа...",[]);
+  const a=await c.access();
+  if(a.state==="ok"){
+    gate={ok:true,owner:!!a.owner};okCache.set();applyAdminUI();unlock();
+    if(gate.owner)loadAdmin();
+    syncCloud();return;
+  }
+  gate={ok:false,owner:false};applyAdminUI();
+  if(a.state==="verify"){lockUI("📧 Потвърди имейла си. Изпратихме писмо (виж и в „Спам“), после натисни „Потвърдих“.",["lkv","lkc","lkout"]);return}
+  if(a.state==="denied"){lockUI("🔒 Няма покана за "+c.user.email+". Поискай покана от собственика.",["lkout"]);return}
+  if(okCache.has()){gate.ok=true;unlock();return}
+  lockUI("⚠️ Грешка при проверката: "+(a.msg||"неизвестна"),["lkr","lkout"]);
+}
+$("lkin").onclick=()=>{$("lg").classList.add("on");lmsg("")};
+$("lkout").onclick=async()=>{try{await window.cloud.signOut()}catch(_){}};
+$("lkv").onclick=async()=>{
+  try{await window.cloud.sendVerify();$("lkmsg").textContent="📧 Изпратих писмото. Провери пощата (и „Спам“), после натисни „Потвърдих“."}
+  catch(e){$("lkmsg").textContent="⛔ "+(ERR[e.code]||e.code||e.message)}
+};
+$("lkc").onclick=async()=>{try{await window.cloud.reloadUser()}catch(_){}applyGate()};
+$("lkr").onclick=()=>{if(window.cloud&&!window.cloud.ok)location.reload();else applyGate()};
+async function copyLink(btn){
+  const u=location.href.split("#")[0].split("?")[0];
+  try{await navigator.clipboard.writeText(u);btn.textContent="✅ Копирано"}
+  catch(_){prompt("Копирай линка:",u)}
+}
+$("lkcp").onclick=()=>copyLink($("lkcp"));
+$("keydel").onclick=async()=>{
+  if(!confirm("Да изтрия ключа от това устройство и от профила?"))return;
+  localStorage.removeItem("oaikey");$("smart").checked=false;
+  if(gate.owner&&window.cloud&&window.cloud.user){try{await window.cloud.adminSave({oaikey:""})}catch(_){}}
+  alert("Ключът е изтрит.");
+};
+// покани (само собственикът)
+const validEmail=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+async function renderInv(){
+  const box=$("invlist");box.textContent="⏳ ...";
+  try{
+    const a=await window.cloud.invList();box.innerHTML="";
+    if(!a.length){box.textContent="Още няма покани.";return}
+    a.sort((x,y)=>(y.t||0)-(x.t||0)).forEach(x=>{
+      const d=document.createElement("div");d.className="pfr";
+      d.innerHTML="<span></span><button>🗑</button>";
+      d.children[0].textContent=x.email;
+      d.children[1].onclick=async()=>{
+        if(!confirm("Да премахна поканата за "+x.email+"?"))return;
+        try{await window.cloud.invDel(x.email)}catch(_){}
+        renderInv();
+      };
+      box.appendChild(d);
+    });
+  }catch(e){box.textContent="⚠️ "+(e.code||e.message)+" (публикувани ли са новите правила във Firebase?)"}
+}
+$("pfinv").onclick=()=>{$("pf").classList.remove("on");$("inv").classList.add("on");$("invmsg").textContent="";renderInv()};
+$("invx").onclick=()=>$("inv").classList.remove("on");
+$("invlink").onclick=()=>copyLink($("invlink"));
+$("invadd").onclick=async()=>{
+  const em=$("invem").value.trim().toLowerCase();
+  if(!validEmail(em)){$("invmsg").textContent="⛔ Невалиден имейл.";return}
+  try{
+    await window.cloud.invAdd(em);$("invem").value="";
+    $("invmsg").textContent="✅ Добавен. Прати му линка и му кажи да влезе с този имейл.";
+    renderInv();
+  }catch(e){$("invmsg").textContent="⛔ "+(e.code||e.message)+" (публикувани ли са новите правила във Firebase?)"}
 };
 
 function authUI(){
@@ -796,7 +1020,7 @@ async function syncCloud(){
   }catch(e){$("hst").textContent="⚠️ Облакът не отговаря"}
   renderH();
 }
-window.addEventListener("cloudauth",()=>{authUI();if(window.cloud&&window.cloud.user)$("lg").classList.remove("on");syncCloud()});
+window.addEventListener("cloudauth",()=>{authUI();if(window.cloud&&window.cloud.user)$("lg").classList.remove("on");applyGate()});
 const ERR={
   "auth/invalid-email":"Невалиден имейл.",
   "auth/missing-password":"Въведи парола.",
@@ -841,6 +1065,9 @@ $("sett").onclick=()=>$("st").classList.add("on");
 $("sx").onclick=()=>$("st").classList.remove("on");
 authUI();
 refreshCal();
+applyAdminUI();
+applyGate();
+setTimeout(()=>{if(fbOn()&&!window.cloud){window.cloud={ok:false};applyGate()}},8000);
 </script>
 <script type="module">
 const cfg=window.FIREBASE_CONFIG;
@@ -850,6 +1077,7 @@ if(cfg&&cfg.apiKey){
     const {initializeApp}=await import(V+"firebase-app.js");
     const A=await import(V+"firebase-auth.js");
     const F=await import(V+"firebase-firestore.js");
+    const OWNER="steliqnstoykov@gmail.com";
     const app=initializeApp(cfg),auth=A.getAuth(app),db=F.getFirestore(app);
     let user=null;
     const col=()=>F.collection(db,"users",user.uid,"history");
@@ -865,7 +1093,22 @@ if(cfg&&cfg.apiKey){
         }
       },
       emailIn:(e,p)=>A.signInWithEmailAndPassword(auth,e,p),
-      emailUp:(e,p)=>A.createUserWithEmailAndPassword(auth,e,p),
+      emailUp:async(e,p)=>{const r=await A.createUserWithEmailAndPassword(auth,e,p);try{await A.sendEmailVerification(r.user)}catch(_){}return r},
+      access:async()=>{
+        if(!user)return{state:"out"};
+        const em=(user.email||"").toLowerCase();
+        if(!user.emailVerified)return{state:"verify"};
+        if(em===OWNER)return{state:"ok",owner:true};
+        try{const d=await F.getDoc(F.doc(db,"allowed",em));return d.exists()?{state:"ok",owner:false}:{state:"denied"}}
+        catch(e){return e.code==="permission-denied"?{state:"denied"}:{state:"error",msg:e.code||e.message}}
+      },
+      sendVerify:()=>A.sendEmailVerification(user),
+      reloadUser:async()=>{await A.reload(user);await user.getIdToken(true)},
+      invList:async()=>{const s=await F.getDocs(F.collection(db,"allowed"));return s.docs.map(d=>d.data())},
+      invAdd:e=>F.setDoc(F.doc(db,"allowed",e.toLowerCase()),{email:e.toLowerCase(),t:Date.now()}),
+      invDel:e=>F.deleteDoc(F.doc(db,"allowed",e.toLowerCase())),
+      adminSave:d=>F.setDoc(F.doc(db,"users",user.uid,"private","admin"),d,{merge:true}),
+      adminLoad:async()=>{const s=await F.getDoc(F.doc(db,"users",user.uid,"private","admin"));return s.exists()?s.data():null},
       reset:e=>A.sendPasswordResetEmail(auth,e),
       signOut:()=>A.signOut(auth),
       save:async it=>{if(user)await F.setDoc(F.doc(db,"users",user.uid,"history",it.id),it)},
@@ -878,7 +1121,7 @@ if(cfg&&cfg.apiKey){
       clear:async()=>{
         if(!user)return;
         for(;;){
-          const s=await F.getDocs(F.query(col(),F.limit(400)));
+          const s=await F.getDocs(F.query(col(),F.limit(15)));
           if(s.empty)break;
           const b=F.writeBatch(db);s.docs.forEach(d=>b.delete(d.ref));await b.commit();
         }

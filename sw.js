@@ -1,4 +1,4 @@
-const C="prevodach-v9";
+const C="prevodach-v12";
 self.addEventListener("install",e=>{
   self.skipWaiting();
   e.waitUntil(caches.open(C).then(c=>c.addAll(["./","index.html","manifest.json","icon-192.png"])).catch(()=>{}));
